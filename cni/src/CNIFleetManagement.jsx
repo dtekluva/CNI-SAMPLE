@@ -2079,6 +2079,738 @@ const CNIFleetManagementUI = () => {
     </Modal>
   );
 
+  // Vehicle Status Badge for Fleet
+  const VehicleStatusBadge = ({ status }) => {
+    const statusConfig = {
+      available: { bg: '#D4EDDA', text: '#155724', label: 'Available', icon: CheckCircle },
+      booked: { bg: '#D1ECF1', text: '#0C5460', label: 'Booked', icon: Calendar },
+      active: { bg: '#CCE5FF', text: '#004085', label: 'Active', icon: Navigation },
+      maintenance: { bg: '#FFF3CD', text: '#856404', label: 'In Maintenance', icon: Wrench },
+      workshop: { bg: '#FFE8CC', text: '#8B5000', label: 'In Workshop', icon: Wrench },
+      dormant: { bg: '#E8E8E8', text: '#505050', label: 'Dormant', icon: AlertCircle },
+    };
+    const config = statusConfig[status] || statusConfig.available;
+    const IconComponent = config.icon;
+
+    return (
+      <span style={{
+        backgroundColor: config.bg,
+        color: config.text,
+        padding: '4px 12px',
+        borderRadius: '12px',
+        fontSize: '12px',
+        fontWeight: '600',
+        display: 'inline-flex',
+        alignItems: 'center',
+        gap: '4px',
+      }}>
+        <IconComponent size={12} />
+        {config.label}
+      </span>
+    );
+  };
+
+  // FLEET LIST VIEW
+  const FleetListView = () => (
+    <div style={{ padding: '32px' }}>
+      {/* KPI Cards */}
+      <div style={{
+        display: 'grid',
+        gridTemplateColumns: 'repeat(6, 1fr)',
+        gap: '16px',
+        marginBottom: '28px'
+      }}>
+        {[
+          { label: 'Total Fleet', value: fleetStats.total, icon: Car, color: colors.primary },
+          { label: 'Available', value: fleetStats.available, icon: CheckCircle, color: colors.success },
+          { label: 'Active', value: fleetStats.active, icon: Navigation, color: colors.info },
+          { label: 'Booked', value: fleetStats.booked, icon: Calendar, color: '#6C63FF' },
+          { label: 'Maintenance', value: fleetStats.maintenance, icon: Wrench, color: colors.warning },
+          { label: 'Expiring Docs', value: fleetStats.expiringDocs, icon: AlertTriangle, color: colors.danger },
+        ].map((stat, idx) => (
+          <div key={idx} style={{
+            backgroundColor: colors.white,
+            borderRadius: '12px',
+            padding: '20px',
+            border: `1px solid ${colors.lightGrey}`,
+            boxShadow: '0 1px 3px rgba(0,0,0,0.05)',
+          }}>
+            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'start' }}>
+              <div>
+                <div style={{ fontSize: '12px', color: colors.mediumGrey, marginBottom: '8px', textTransform: 'uppercase', fontWeight: '600' }}>
+                  {stat.label}
+                </div>
+                <div style={{ fontSize: '28px', fontWeight: '700', color: colors.darkGrey }}>
+                  {stat.value}
+                </div>
+              </div>
+              <div style={{
+                width: '44px',
+                height: '44px',
+                backgroundColor: `${stat.color}15`,
+                borderRadius: '10px',
+                display: 'flex',
+                alignItems: 'center',
+                justifyContent: 'center',
+              }}>
+                <stat.icon size={22} color={stat.color} />
+              </div>
+            </div>
+          </div>
+        ))}
+      </div>
+
+      {/* Actions Bar */}
+      <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '24px' }}>
+        <div style={{ display: 'flex', gap: '12px', flex: 1 }}>
+          <div style={{
+            display: 'flex',
+            alignItems: 'center',
+            backgroundColor: colors.white,
+            border: `1px solid ${colors.lightGrey}`,
+            borderRadius: '8px',
+            padding: '10px 16px',
+            gap: '10px',
+            width: '350px',
+          }}>
+            <Search size={18} color={colors.mediumGrey} />
+            <input
+              type="text"
+              placeholder="Search by vehicle ID, name, or registration..."
+              style={{ border: 'none', outline: 'none', flex: 1, fontSize: '14px' }}
+            />
+          </div>
+
+          {/* Status Filter Tabs */}
+          <div style={{ display: 'flex', gap: '6px', backgroundColor: colors.white, padding: '6px', borderRadius: '8px', border: `1px solid ${colors.lightGrey}` }}>
+            {['all', 'available', 'active', 'booked', 'maintenance', 'dormant'].map(status => (
+              <button
+                key={status}
+                onClick={() => setFleetStatusFilter(status)}
+                style={{
+                  padding: '6px 14px',
+                  backgroundColor: fleetStatusFilter === status ? colors.primary : 'transparent',
+                  color: fleetStatusFilter === status ? colors.white : colors.mediumGrey,
+                  border: 'none',
+                  borderRadius: '6px',
+                  cursor: 'pointer',
+                  fontSize: '13px',
+                  fontWeight: '600',
+                  textTransform: 'capitalize',
+                  transition: 'all 0.2s',
+                }}
+              >
+                {status}
+              </button>
+            ))}
+          </div>
+        </div>
+
+        <div style={{ display: 'flex', gap: '12px' }}>
+          <Button
+            variant={fleetViewMode === 'grid' ? 'primary' : 'ghost'}
+            onClick={() => setFleetViewMode('grid')}
+          >
+            Grid
+          </Button>
+          <Button
+            variant={fleetViewMode === 'table' ? 'primary' : 'ghost'}
+            onClick={() => setFleetViewMode('table')}
+          >
+            Table
+          </Button>
+          <Button variant="ghost" icon={Map} onClick={() => setFleetSubView('map')}>
+            Live Map
+          </Button>
+          <Button variant="ghost" icon={Download}>
+            Export
+          </Button>
+          <Button icon={Plus}>
+            Add Vehicle
+          </Button>
+        </div>
+      </div>
+
+      {/* Grid View */}
+      {fleetViewMode === 'grid' && (
+        <div style={{ display: 'grid', gridTemplateColumns: 'repeat(4, 1fr)', gap: '20px' }}>
+          {filteredFleet.map(vehicle => (
+            <div
+              key={vehicle.id}
+              onClick={() => {
+                setSelectedVehicle(vehicle);
+                setFleetSubView('details');
+              }}
+              style={{
+                backgroundColor: colors.white,
+                borderRadius: '12px',
+                overflow: 'hidden',
+                border: `1px solid ${colors.lightGrey}`,
+                cursor: 'pointer',
+                transition: 'all 0.2s',
+                boxShadow: '0 1px 3px rgba(0,0,0,0.05)',
+              }}
+              onMouseEnter={(e) => {
+                e.currentTarget.style.transform = 'translateY(-4px)';
+                e.currentTarget.style.boxShadow = '0 8px 16px rgba(0,0,0,0.1)';
+              }}
+              onMouseLeave={(e) => {
+                e.currentTarget.style.transform = 'translateY(0)';
+                e.currentTarget.style.boxShadow = '0 1px 3px rgba(0,0,0,0.05)';
+              }}
+            >
+              {/* Vehicle Header */}
+              <div style={{
+                height: '100px',
+                backgroundColor: '#F0F4F8',
+                display: 'flex',
+                alignItems: 'center',
+                justifyContent: 'center',
+                position: 'relative',
+              }}>
+                <Car size={48} color={colors.mediumGrey} />
+                <div style={{ position: 'absolute', top: '10px', right: '10px' }}>
+                  <VehicleStatusBadge status={vehicle.status} />
+                </div>
+                {vehicle.gps.ignition && (
+                  <div style={{
+                    position: 'absolute',
+                    top: '10px',
+                    left: '10px',
+                    backgroundColor: colors.success,
+                    borderRadius: '50%',
+                    width: '12px',
+                    height: '12px',
+                    animation: 'pulse 2s infinite',
+                  }} title="Ignition On" />
+                )}
+              </div>
+
+              {/* Vehicle Info */}
+              <div style={{ padding: '16px' }}>
+                <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'start', marginBottom: '8px' }}>
+                  <div>
+                    <div style={{ fontSize: '11px', color: colors.primary, fontWeight: '700' }}>{vehicle.id}</div>
+                    <div style={{ fontSize: '15px', fontWeight: '700', color: colors.darkGrey }}>{vehicle.name}</div>
+                  </div>
+                </div>
+
+                <div style={{ fontSize: '12px', color: colors.mediumGrey, marginBottom: '12px' }}>
+                  {vehicle.registrationNo} • {vehicle.color}
+                </div>
+
+                {/* Quick Stats */}
+                <div style={{
+                  display: 'grid',
+                  gridTemplateColumns: 'repeat(3, 1fr)',
+                  gap: '8px',
+                  padding: '12px 0',
+                  borderTop: `1px solid ${colors.lightGrey}`,
+                  borderBottom: `1px solid ${colors.lightGrey}`,
+                  marginBottom: '12px',
+                }}>
+                  <div style={{ textAlign: 'center' }}>
+                    <Gauge size={14} color={colors.mediumGrey} />
+                    <div style={{ fontSize: '11px', color: colors.mediumGrey, marginTop: '2px' }}>
+                      {vehicle.mileage.toLocaleString()} km
+                    </div>
+                  </div>
+                  <div style={{ textAlign: 'center' }}>
+                    <Fuel size={14} color={vehicle.fuelLevel < 25 ? colors.danger : colors.mediumGrey} />
+                    <div style={{ fontSize: '11px', color: vehicle.fuelLevel < 25 ? colors.danger : colors.mediumGrey, marginTop: '2px' }}>
+                      {vehicle.fuelLevel}%
+                    </div>
+                  </div>
+                  <div style={{ textAlign: 'center' }}>
+                    <Battery size={14} color={vehicle.batteryVoltage < 12 ? colors.warning : colors.mediumGrey} />
+                    <div style={{ fontSize: '11px', color: colors.mediumGrey, marginTop: '2px' }}>
+                      {vehicle.batteryVoltage}V
+                    </div>
+                  </div>
+                </div>
+
+                {/* Location or Assignment */}
+                <div style={{ fontSize: '12px', color: colors.mediumGrey, display: 'flex', alignItems: 'center', gap: '6px' }}>
+                  <MapPin size={12} />
+                  {vehicle.gps.address.length > 25 ? vehicle.gps.address.substring(0, 25) + '...' : vehicle.gps.address}
+                </div>
+
+                {vehicle.assignedDriver && (
+                  <div style={{ fontSize: '12px', color: colors.info, marginTop: '6px', display: 'flex', alignItems: 'center', gap: '6px' }}>
+                    <User size={12} />
+                    {vehicle.assignedDriver}
+                  </div>
+                )}
+
+                {/* Document Alerts */}
+                {vehicle.documents.some(d => d.status === 'expiring') && (
+                  <div style={{
+                    marginTop: '10px',
+                    padding: '8px',
+                    backgroundColor: '#FFF3CD',
+                    borderRadius: '6px',
+                    fontSize: '11px',
+                    color: '#856404',
+                    display: 'flex',
+                    alignItems: 'center',
+                    gap: '6px',
+                  }}>
+                    <AlertTriangle size={12} />
+                    {vehicle.documents.filter(d => d.status === 'expiring').length} document(s) expiring soon
+                  </div>
+                )}
+              </div>
+            </div>
+          ))}
+        </div>
+      )}
+    </div>
+  );
+
+  // FLEET VEHICLE DETAILS VIEW
+  const FleetVehicleDetailsView = () => {
+    if (!selectedVehicle) return null;
+    const v = selectedVehicle;
+
+    return (
+      <div style={{ padding: '32px' }}>
+        {/* Back Button and Actions */}
+        <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '24px' }}>
+          <button
+            onClick={() => setFleetSubView('list')}
+            style={{
+              display: 'flex',
+              alignItems: 'center',
+              gap: '8px',
+              padding: '10px 20px',
+              backgroundColor: colors.white,
+              border: `1px solid ${colors.lightGrey}`,
+              borderRadius: '8px',
+              cursor: 'pointer',
+              fontSize: '14px',
+              fontWeight: '600',
+              color: colors.darkGrey,
+            }}
+          >
+            <ChevronLeft size={18} />
+            Back to Fleet
+          </button>
+          <div style={{ display: 'flex', gap: '12px' }}>
+            <Button variant="ghost" icon={Edit}>Edit Vehicle</Button>
+            <Button variant="ghost" icon={Wrench}>Schedule Service</Button>
+            <Button variant="ghost" icon={FileText}>Documents</Button>
+            <Button icon={Navigation}>Track Live</Button>
+          </div>
+        </div>
+
+        {/* Vehicle Header Card */}
+        <div style={{
+          backgroundColor: colors.white,
+          borderRadius: '16px',
+          padding: '28px',
+          marginBottom: '24px',
+          border: `1px solid ${colors.lightGrey}`,
+          boxShadow: '0 2px 8px rgba(0,0,0,0.05)',
+        }}>
+          <div style={{ display: 'flex', gap: '28px' }}>
+            {/* Vehicle Image Placeholder */}
+            <div style={{
+              width: '220px',
+              height: '160px',
+              backgroundColor: '#F0F4F8',
+              borderRadius: '12px',
+              display: 'flex',
+              alignItems: 'center',
+              justifyContent: 'center',
+              flexShrink: 0,
+            }}>
+              <Car size={72} color={colors.mediumGrey} />
+            </div>
+
+            {/* Vehicle Info */}
+            <div style={{ flex: 1 }}>
+              <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'start', marginBottom: '12px' }}>
+                <div>
+                  <div style={{ display: 'flex', alignItems: 'center', gap: '12px', marginBottom: '6px' }}>
+                    <span style={{ fontSize: '13px', color: colors.primary, fontWeight: '700', backgroundColor: `${colors.primary}15`, padding: '4px 12px', borderRadius: '6px' }}>
+                      {v.id}
+                    </span>
+                    <VehicleStatusBadge status={v.status} />
+                    {v.gps.ignition && (
+                      <span style={{ display: 'flex', alignItems: 'center', gap: '4px', fontSize: '12px', color: colors.success }}>
+                        <Circle size={8} fill={colors.success} /> Engine Running
+                      </span>
+                    )}
+                  </div>
+                  <h2 style={{ fontSize: '26px', fontWeight: '700', color: colors.darkGrey, margin: '0 0 8px 0' }}>
+                    {v.name}
+                  </h2>
+                  <div style={{ fontSize: '14px', color: colors.mediumGrey }}>
+                    {v.make} {v.model} • {v.year} • {v.color} • {v.transmission}
+                  </div>
+                </div>
+              </div>
+
+              <div style={{ display: 'flex', gap: '32px', marginTop: '20px' }}>
+                <div>
+                  <div style={{ fontSize: '12px', color: colors.mediumGrey, marginBottom: '4px' }}>Registration</div>
+                  <div style={{ fontSize: '15px', fontWeight: '600', color: colors.darkGrey }}>{v.registrationNo}</div>
+                </div>
+                <div>
+                  <div style={{ fontSize: '12px', color: colors.mediumGrey, marginBottom: '4px' }}>VIN</div>
+                  <div style={{ fontSize: '15px', fontWeight: '600', color: colors.darkGrey }}>{v.vin}</div>
+                </div>
+                <div>
+                  <div style={{ fontSize: '12px', color: colors.mediumGrey, marginBottom: '4px' }}>Fuel Type</div>
+                  <div style={{ fontSize: '15px', fontWeight: '600', color: colors.darkGrey }}>{v.fuelType}</div>
+                </div>
+                <div>
+                  <div style={{ fontSize: '12px', color: colors.mediumGrey, marginBottom: '4px' }}>Seats</div>
+                  <div style={{ fontSize: '15px', fontWeight: '600', color: colors.darkGrey }}>{v.seats}</div>
+                </div>
+              </div>
+            </div>
+          </div>
+        </div>
+
+        {/* Main Content Grid */}
+        <div style={{ display: 'grid', gridTemplateColumns: '2fr 1fr', gap: '24px' }}>
+          {/* Left Column */}
+          <div style={{ display: 'flex', flexDirection: 'column', gap: '24px' }}>
+            {/* Real-time Status */}
+            <div style={{
+              backgroundColor: colors.white,
+              borderRadius: '12px',
+              padding: '24px',
+              border: `1px solid ${colors.lightGrey}`,
+            }}>
+              <h3 style={{ fontSize: '16px', fontWeight: '700', color: colors.darkGrey, margin: '0 0 20px 0', display: 'flex', alignItems: 'center', gap: '8px' }}>
+                <Activity size={18} color={colors.primary} /> Real-Time Status
+              </h3>
+              <div style={{ display: 'grid', gridTemplateColumns: 'repeat(4, 1fr)', gap: '20px' }}>
+                <div style={{ textAlign: 'center', padding: '16px', backgroundColor: '#F8F9FA', borderRadius: '10px' }}>
+                  <Gauge size={24} color={colors.primary} />
+                  <div style={{ fontSize: '22px', fontWeight: '700', color: colors.darkGrey, margin: '8px 0 4px' }}>
+                    {v.mileage.toLocaleString()}
+                  </div>
+                  <div style={{ fontSize: '12px', color: colors.mediumGrey }}>Total KM</div>
+                </div>
+                <div style={{ textAlign: 'center', padding: '16px', backgroundColor: '#F8F9FA', borderRadius: '10px' }}>
+                  <Fuel size={24} color={v.fuelLevel < 25 ? colors.danger : colors.success} />
+                  <div style={{ fontSize: '22px', fontWeight: '700', color: v.fuelLevel < 25 ? colors.danger : colors.darkGrey, margin: '8px 0 4px' }}>
+                    {v.fuelLevel}%
+                  </div>
+                  <div style={{ fontSize: '12px', color: colors.mediumGrey }}>Fuel Level</div>
+                </div>
+                <div style={{ textAlign: 'center', padding: '16px', backgroundColor: '#F8F9FA', borderRadius: '10px' }}>
+                  <Battery size={24} color={v.batteryVoltage < 12 ? colors.warning : colors.success} />
+                  <div style={{ fontSize: '22px', fontWeight: '700', color: colors.darkGrey, margin: '8px 0 4px' }}>
+                    {v.batteryVoltage}V
+                  </div>
+                  <div style={{ fontSize: '12px', color: colors.mediumGrey }}>Battery</div>
+                </div>
+                <div style={{ textAlign: 'center', padding: '16px', backgroundColor: '#F8F9FA', borderRadius: '10px' }}>
+                  <Navigation size={24} color={colors.info} />
+                  <div style={{ fontSize: '22px', fontWeight: '700', color: colors.darkGrey, margin: '8px 0 4px' }}>
+                    {v.gps.speed}
+                  </div>
+                  <div style={{ fontSize: '12px', color: colors.mediumGrey }}>Speed (km/h)</div>
+                </div>
+              </div>
+            </div>
+
+            {/* GPS Location */}
+            <div style={{
+              backgroundColor: colors.white,
+              borderRadius: '12px',
+              padding: '24px',
+              border: `1px solid ${colors.lightGrey}`,
+            }}>
+              <h3 style={{ fontSize: '16px', fontWeight: '700', color: colors.darkGrey, margin: '0 0 20px 0', display: 'flex', alignItems: 'center', gap: '8px' }}>
+                <MapPin size={18} color={colors.primary} /> GPS Location
+              </h3>
+              <div style={{
+                height: '200px',
+                backgroundColor: '#E8F4EA',
+                borderRadius: '10px',
+                display: 'flex',
+                alignItems: 'center',
+                justifyContent: 'center',
+                marginBottom: '16px',
+                position: 'relative',
+              }}>
+                <Map size={48} color={colors.success} />
+                <div style={{ position: 'absolute', bottom: '12px', left: '12px', backgroundColor: colors.white, padding: '8px 12px', borderRadius: '6px', fontSize: '12px' }}>
+                  📍 {v.gps.address}
+                </div>
+              </div>
+              <div style={{ display: 'grid', gridTemplateColumns: 'repeat(4, 1fr)', gap: '16px' }}>
+                <div>
+                  <div style={{ fontSize: '11px', color: colors.mediumGrey }}>Latitude</div>
+                  <div style={{ fontSize: '14px', fontWeight: '600' }}>{v.gps.latitude}</div>
+                </div>
+                <div>
+                  <div style={{ fontSize: '11px', color: colors.mediumGrey }}>Longitude</div>
+                  <div style={{ fontSize: '14px', fontWeight: '600' }}>{v.gps.longitude}</div>
+                </div>
+                <div>
+                  <div style={{ fontSize: '11px', color: colors.mediumGrey }}>Heading</div>
+                  <div style={{ fontSize: '14px', fontWeight: '600' }}>{v.gps.heading}</div>
+                </div>
+                <div>
+                  <div style={{ fontSize: '11px', color: colors.mediumGrey }}>Signal</div>
+                  <div style={{ fontSize: '14px', fontWeight: '600', color: v.gps.signalQuality === 'Good' ? colors.success : colors.warning }}>{v.gps.signalQuality}</div>
+                </div>
+              </div>
+            </div>
+          </div>
+
+          {/* Right Column */}
+          <div style={{ display: 'flex', flexDirection: 'column', gap: '24px' }}>
+            {/* Current Assignment */}
+            {v.currentBooking && (
+              <div style={{
+                backgroundColor: colors.white,
+                borderRadius: '12px',
+                padding: '24px',
+                border: `1px solid ${colors.lightGrey}`,
+              }}>
+                <h3 style={{ fontSize: '16px', fontWeight: '700', color: colors.darkGrey, margin: '0 0 16px 0', display: 'flex', alignItems: 'center', gap: '8px' }}>
+                  <Calendar size={18} color={colors.primary} /> Current Assignment
+                </h3>
+                <div style={{ padding: '16px', backgroundColor: '#E8F4FC', borderRadius: '10px' }}>
+                  <div style={{ fontSize: '13px', color: colors.info, fontWeight: '600', marginBottom: '8px' }}>{v.currentBooking}</div>
+                  <div style={{ fontSize: '15px', fontWeight: '600', color: colors.darkGrey, marginBottom: '8px' }}>{v.currentClient}</div>
+                  <div style={{ fontSize: '13px', color: colors.mediumGrey, display: 'flex', alignItems: 'center', gap: '6px' }}>
+                    <User size={14} /> {v.assignedDriver}
+                  </div>
+                </div>
+              </div>
+            )}
+
+            {/* Documents Status */}
+            <div style={{
+              backgroundColor: colors.white,
+              borderRadius: '12px',
+              padding: '24px',
+              border: `1px solid ${colors.lightGrey}`,
+            }}>
+              <h3 style={{ fontSize: '16px', fontWeight: '700', color: colors.darkGrey, margin: '0 0 16px 0', display: 'flex', alignItems: 'center', gap: '8px' }}>
+                <FileCheck size={18} color={colors.primary} /> Documents
+              </h3>
+              {v.documents.map((doc, idx) => (
+                <div key={idx} style={{
+                  display: 'flex',
+                  justifyContent: 'space-between',
+                  alignItems: 'center',
+                  padding: '12px 0',
+                  borderBottom: idx < v.documents.length - 1 ? `1px solid ${colors.lightGrey}` : 'none',
+                }}>
+                  <div>
+                    <div style={{ fontSize: '14px', fontWeight: '500', color: colors.darkGrey }}>{doc.type}</div>
+                    <div style={{ fontSize: '12px', color: colors.mediumGrey }}>Expires: {doc.expiry}</div>
+                  </div>
+                  <span style={{
+                    padding: '4px 10px',
+                    borderRadius: '12px',
+                    fontSize: '11px',
+                    fontWeight: '600',
+                    backgroundColor: doc.status === 'valid' ? '#D4EDDA' : '#FFF3CD',
+                    color: doc.status === 'valid' ? '#155724' : '#856404',
+                  }}>
+                    {doc.status === 'valid' ? 'Valid' : 'Expiring Soon'}
+                  </span>
+                </div>
+              ))}
+            </div>
+
+            {/* Maintenance History */}
+            <div style={{
+              backgroundColor: colors.white,
+              borderRadius: '12px',
+              padding: '24px',
+              border: `1px solid ${colors.lightGrey}`,
+            }}>
+              <h3 style={{ fontSize: '16px', fontWeight: '700', color: colors.darkGrey, margin: '0 0 16px 0', display: 'flex', alignItems: 'center', gap: '8px' }}>
+                <Wrench size={18} color={colors.primary} /> Maintenance History
+              </h3>
+              {v.maintenanceHistory.length > 0 ? v.maintenanceHistory.map((m, idx) => (
+                <div key={idx} style={{
+                  padding: '12px 0',
+                  borderBottom: idx < v.maintenanceHistory.length - 1 ? `1px solid ${colors.lightGrey}` : 'none',
+                }}>
+                  <div style={{ display: 'flex', justifyContent: 'space-between' }}>
+                    <div style={{ fontSize: '14px', fontWeight: '500', color: colors.darkGrey }}>{m.type}</div>
+                    <div style={{ fontSize: '13px', fontWeight: '600', color: colors.primary }}>₦{m.cost.toLocaleString()}</div>
+                  </div>
+                  <div style={{ fontSize: '12px', color: colors.mediumGrey, marginTop: '4px' }}>
+                    {m.date} • {m.vendor} • {m.mileage.toLocaleString()} km
+                  </div>
+                </div>
+              )) : (
+                <div style={{ fontSize: '13px', color: colors.mediumGrey, textAlign: 'center', padding: '20px' }}>
+                  No maintenance records yet
+                </div>
+              )}
+            </div>
+          </div>
+        </div>
+      </div>
+    );
+  };
+
+  // FLEET LIVE MAP VIEW
+  const FleetLiveMapView = () => (
+    <div style={{ padding: '32px' }}>
+      {/* Header */}
+      <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '24px' }}>
+        <button
+          onClick={() => setFleetSubView('list')}
+          style={{
+            display: 'flex',
+            alignItems: 'center',
+            gap: '8px',
+            padding: '10px 20px',
+            backgroundColor: colors.white,
+            border: `1px solid ${colors.lightGrey}`,
+            borderRadius: '8px',
+            cursor: 'pointer',
+            fontSize: '14px',
+            fontWeight: '600',
+            color: colors.darkGrey,
+          }}
+        >
+          <ChevronLeft size={18} />
+          Back to Fleet
+        </button>
+        <h2 style={{ fontSize: '22px', fontWeight: '700', color: colors.darkGrey, margin: 0, display: 'flex', alignItems: 'center', gap: '10px' }}>
+          <Map size={24} color={colors.primary} />
+          Live Fleet Map
+        </h2>
+        <div style={{ display: 'flex', gap: '12px' }}>
+          <Button variant="ghost" icon={RefreshCw}>Refresh</Button>
+          <Button variant="ghost" icon={Filter}>Filter</Button>
+        </div>
+      </div>
+
+      {/* Map Container */}
+      <div style={{ display: 'grid', gridTemplateColumns: '1fr 350px', gap: '24px' }}>
+        {/* Map Placeholder */}
+        <div style={{
+          backgroundColor: colors.white,
+          borderRadius: '16px',
+          overflow: 'hidden',
+          border: `1px solid ${colors.lightGrey}`,
+          height: 'calc(100vh - 220px)',
+          position: 'relative',
+        }}>
+          <div style={{
+            height: '100%',
+            backgroundColor: '#E8F4EA',
+            display: 'flex',
+            alignItems: 'center',
+            justifyContent: 'center',
+            flexDirection: 'column',
+            gap: '16px',
+          }}>
+            <Map size={80} color={colors.success} />
+            <div style={{ fontSize: '18px', fontWeight: '600', color: colors.darkGrey }}>
+              Google Maps Integration
+            </div>
+            <div style={{ fontSize: '14px', color: colors.mediumGrey }}>
+              Connect Ganoli GPS API to display live vehicle locations
+            </div>
+          </div>
+
+          {/* Map Legend */}
+          <div style={{
+            position: 'absolute',
+            bottom: '20px',
+            left: '20px',
+            backgroundColor: colors.white,
+            padding: '16px',
+            borderRadius: '10px',
+            boxShadow: '0 2px 8px rgba(0,0,0,0.15)',
+          }}>
+            <div style={{ fontSize: '12px', fontWeight: '600', marginBottom: '12px' }}>LEGEND</div>
+            <div style={{ display: 'flex', flexDirection: 'column', gap: '8px' }}>
+              {[
+                { color: colors.success, label: 'Active (Moving)' },
+                { color: colors.info, label: 'Booked' },
+                { color: '#6C757D', label: 'Available (Parked)' },
+                { color: colors.warning, label: 'Maintenance' },
+                { color: '#DC3545', label: 'Alert' },
+              ].map((item, idx) => (
+                <div key={idx} style={{ display: 'flex', alignItems: 'center', gap: '8px', fontSize: '12px' }}>
+                  <div style={{ width: '10px', height: '10px', borderRadius: '50%', backgroundColor: item.color }} />
+                  {item.label}
+                </div>
+              ))}
+            </div>
+          </div>
+        </div>
+
+        {/* Vehicle List Panel */}
+        <div style={{
+          backgroundColor: colors.white,
+          borderRadius: '16px',
+          border: `1px solid ${colors.lightGrey}`,
+          overflow: 'hidden',
+        }}>
+          <div style={{ padding: '16px', borderBottom: `1px solid ${colors.lightGrey}` }}>
+            <h3 style={{ fontSize: '15px', fontWeight: '700', margin: 0, color: colors.darkGrey }}>
+              Fleet Vehicles ({fleetVehicles.length})
+            </h3>
+          </div>
+          <div style={{ maxHeight: 'calc(100vh - 310px)', overflowY: 'auto' }}>
+            {fleetVehicles.map(vehicle => (
+              <div
+                key={vehicle.id}
+                onClick={() => {
+                  setSelectedVehicle(vehicle);
+                  setFleetSubView('details');
+                }}
+                style={{
+                  padding: '14px 16px',
+                  borderBottom: `1px solid ${colors.lightGrey}`,
+                  cursor: 'pointer',
+                  transition: 'background-color 0.2s',
+                }}
+                onMouseEnter={(e) => e.currentTarget.style.backgroundColor = '#F8F9FA'}
+                onMouseLeave={(e) => e.currentTarget.style.backgroundColor = 'transparent'}
+              >
+                <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'start', marginBottom: '6px' }}>
+                  <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
+                    <div style={{
+                      width: '8px',
+                      height: '8px',
+                      borderRadius: '50%',
+                      backgroundColor: vehicle.gps.ignition ? colors.success : colors.mediumGrey,
+                    }} />
+                    <span style={{ fontSize: '11px', fontWeight: '700', color: colors.primary }}>{vehicle.id}</span>
+                  </div>
+                  <VehicleStatusBadge status={vehicle.status} />
+                </div>
+                <div style={{ fontSize: '14px', fontWeight: '600', color: colors.darkGrey, marginBottom: '4px' }}>
+                  {vehicle.name}
+                </div>
+                <div style={{ fontSize: '12px', color: colors.mediumGrey, display: 'flex', alignItems: 'center', gap: '4px' }}>
+                  <MapPin size={11} />
+                  {vehicle.gps.address}
+                </div>
+                {vehicle.gps.speed > 0 && (
+                  <div style={{ fontSize: '11px', color: colors.success, marginTop: '4px' }}>
+                    Moving at {vehicle.gps.speed} km/h • Heading {vehicle.gps.heading}
+                  </div>
+                )}
+              </div>
+            ))}
+          </div>
+        </div>
+      </div>
+    </div>
+  );
+
   // Main render
   return (
     <div style={{
@@ -2101,7 +2833,14 @@ const CNIFleetManagementUI = () => {
               {bookingsSubView === 'calendar' && <CalendarView />}
             </>
           )}
-          {currentView !== 'bookings' && (
+          {currentView === 'fleet' && (
+            <>
+              {fleetSubView === 'list' && <FleetListView />}
+              {fleetSubView === 'details' && <FleetVehicleDetailsView />}
+              {fleetSubView === 'map' && <FleetLiveMapView />}
+            </>
+          )}
+          {currentView !== 'bookings' && currentView !== 'fleet' && (
             <div style={{ padding: '80px 32px', textAlign: 'center' }}>
               <div style={{
                 display: 'inline-block',
