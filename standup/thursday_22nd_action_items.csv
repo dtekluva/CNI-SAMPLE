@@ -1,0 +1,18 @@
+user,action_items,planned_completion_date,meeting_timestamp
+"Abibat Abdulraheem","Resolve fixes and test Merchant Acquisition dashboard endpoints; work on merchant transaction value data; set up automated email summaries to merchants","Thu 22nd","06:27"
+"Augustine Jibunoh","Finalize Paystack integration for Circle by Seeds → Paybox (fix unsettled payments and missing success-page redirects)","Thu 22nd","08:01"
+"Chika Agbo","Implement automatic internal update system for MDM core app (self-update) and deploy to devices","Fri 23rd (by tomorrow)","09:12"
+"Christopher James","Close out Hustle amount selection feature work and resolve remaining input issues after sync with Ginger/team","Thu 22nd","10:18"
+"Daniel Ugah","Final testing and completion of multi-channel disbursement routing (in-house + secondary channel)","Thu 22nd","11:42"
+"Desmond Nnebue","Complete data cleanup for region/banker distinctions; address remaining visibility issues tied to outdated user inputs","Thu 22nd","13:38"
+"Emmanuel Ayodeji","Finish Get Link profile settings page; continue Flip & Pass multiplayer version work","Thu 22nd","14:56"
+"Joseph Chinedu","Monitor Winwise after mandate-closing fixes on agency banking","Thu 22nd","17:43"
+"Khalid Oni","Extend attendance marking from Fri–Sun to full week (agent-branch mapping issues); continue radio station admin UI work","Thu 22nd","19:32"
+"Moyinoluwa Olatona","Integrate Ably services to fix backend push notification triggers; continue Flip & Pass multiplayer work","Thu 22nd","22:00"
+"Joseph Ndunche","Follow-up bug fix on career page after pushing privacy policy updates to production","Thu 22nd","23:55"
+"Tobi Taiwo","Complete Talent Profile updates (session tracking + email triggers on login) for rollout","Thu 22nd","26:06"
+"Sunday Olaofe","Share end-of-week report summarizing individual contributions and meeting discussions","End of week","31:04"
+"Inyang Kpongette","Drive broader adoption of change log updates (target by Tuesday); share meeting notes/task sheets; share end-of-week report","By Tuesday (and end of week for report)","29:40"
+"Azubike Odu","Continue Chest Lock fixes and Golden Hour Loto revamp work","Thu 22nd","28:37"
+"Roosevelt Abandy","MDM support/coordination (noted as confirming MDM efforts; no explicit task captured)","Thu 22nd",""
+

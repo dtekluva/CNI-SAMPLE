@@ -1,0 +1,2 @@
+branch_id,branch_name,address,city,region_id,utility_tariff,email,copy_email,is_active
+4,Residence,Banana,,,A,tundetti@gmail.com,,True

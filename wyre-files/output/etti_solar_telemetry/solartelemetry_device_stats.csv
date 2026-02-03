@@ -1,0 +1,3 @@
+branch_id,device_id,ts_min_utc,ts_max_utc,rows,pv_power_max,load_power_max,battery_power_abs_max,grid_power_abs_max
+4,2,2025-11-04 11:40:00+00:00,2026-01-21 13:20:00+00:00,10562,13.058,15.659,12.94,8.334
+4,4,2025-11-04 11:40:00+00:00,2026-01-21 13:20:00+00:00,10559,20.283,16.47,13.491,8.029

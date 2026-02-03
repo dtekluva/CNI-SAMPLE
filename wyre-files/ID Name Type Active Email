@@ -1,0 +1,66 @@
+ID    Name                                     Type            Active   Email                         
+----------------------------------------------------------------------------------------------------
+1     Sapio Utilities                          RESELLER        ✓ Yes    sample@mail.com               
+2     DEMO CLIENT                              RESELLER        ✓ Yes    sample@mail.com               
+3     Alpha Mead                               STANDARD        ✓ Yes    pikarb.dey-ola@alphamead.com  
+4     Mr Durosinmi Etti                        BESPOKE         ✓ Yes    sample@mail.com               
+5     Dremo Drizzy                             STANDARD        ✓ Yes    sample@mail.com               
+6     Yinka Olukoya                            STANDARD        ✓ Yes    sample@mail.com               
+7     Lennox Mall                              STANDARD        ✓ Yes    admin@admin.com               
+8     Wyre                                     WYRE            ✓ Yes    support@wyreng.com            
+9     PPL-OFFICE                               STANDARD        ✓ Yes    sample@mail.com               
+10    VIATHAN                                  RESELLER        ✓ Yes    sample@mail.com               
+11    Grand View Plaza                         STANDARD        ✓ Yes    sample@mail.com               
+12    Bukka Hut                                STANDARD        ✓ Yes    sample@mail.com               
+13    Grace Court                              STANDARD        ✓ Yes    sample@mail.com               
+14    Sky View Beach                           BESPOKE         ✓ Yes    sample@mail.com               
+15    Polaris Bank                             STANDARD        ✓ Yes    example@polaris.com           
+16    RC Terraces                              BESPOKE         ✓ Yes    sample@mail.com               
+17    Royal Garden                             STANDARD        ✓ Yes    sample@mail.com               
+18    Calari II                                STANDARD        ✓ Yes    sample@mail.com               
+19    Trinity Tower                            STANDARD        ✓ Yes    sample@mail.com               
+20    Sweetco                                  RESELLER        ✓ Yes    sample@mail.com               
+21    Liberty                                  STANDARD        ✓ Yes    Inyangete@gmail.com           
+22    Landmark                                 STANDARD        ✓ Yes    example@mail.com              
+23    UPDC                                     STANDARD        ✓ Yes    cakanno@updcfm.com            
+24    DAMTAQ                                   BESPOKE         ✓ Yes    E.oraka@damtaq.com            
+25    Chudi                                    STANDARD        ✓ Yes    Chudiamu@gmail.com            
+26    Probyte Systems                          STANDARD        ✓ Yes    admin@probytesystems.net      
+27    Chicken Republic                         BESPOKE         ✓ Yes    example@gmail.com             
+28    Union Bank                               STANDARD        ✓ Yes    example@unionbank.com         
+29    Eco Bank                                 STANDARD        ✓ Yes    example@ecobank.com           
+30    Meadow Hall                              BESPOKE         ✓ Yes    example@meadow-hall.com       
+31    American Towers                          BULK_MONITORING ✓ Yes    example@atc.com               
+32    Otimeyin                                 STANDARD        ✓ Yes    liberty@gmail.com             
+33    Festival                                 STANDARD        ✓ Yes    cakanno@updcfm.com            
+34    Access                                   STANDARD        ✓ Yes    example@access.com            
+35    OANDO                                    STANDARD        ✓ Yes    ofagbayide@Oandoplc.com       
+46    Mary jane                                STANDARD        ✓ Yes    john@gmail.com                
+81    Acme Corp@                               BESPOKE         ✓ Yes    info2@acme.com                
+91    john doe                                 STANDARD        ✓ Yes    johndoe@gmail.com             
+94    BOI                                      STANDARD        ✗ No     kayode.sodiq@wyreng.com       
+95    Bright Spot                              STANDARD        ✗ No     sample@mail.com               
+98    Ejeh Israel                              STANDARD        ✗ No     eazyboy494@gmail.com          
+99    israel                                   STANDARD        ✗ No     eazyboy494@gmail.com          
+100   ejeh israel                              STANDARD        ✗ No     eazyboy@gmail.com             
+101   Eazy Boy                                 STANDARD        ✗ No     eazyboy@gmail.com             
+102   BOI                                      BESPOKE         ✗ No     sample@boi.com                
+103   Ejeh Israel                              STANDARD        ✗ No     israelejeh08@gmail.com        
+104   Whitestone Apartment                     STANDARD        ✗ No     sample@whitestone.com         
+105   Grace Court                              STANDARD        ✗ No     N/A                           
+106   Ejeh's Corp                              STANDARD        ✗ No     ejehameh01@gmail.com          
+
+====================================================================================================
+
+Summary:
+  Total Clients: 49
+  Active: 38
+  Inactive: 11
+  Standard: 35
+  Reseller: 4
+
+====================================================================================================
+(venv) MacBook-Pro-2:wyre-files manager$ :
+(venv) MacBook-Pro-2:wyre-files manager$ python3 meadow_hall_devices.py
+====================================================================================================
+Meadow Hall Devices
