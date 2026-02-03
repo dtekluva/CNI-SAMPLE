@@ -3158,7 +3158,7 @@ const CNIFleetManagementUI = () => {
               </div>
             </div>
 
-            {/* GPS Location */}
+            {/* GPS Location with Actual Map */}
             <div style={{
               backgroundColor: colors.white,
               borderRadius: '12px',
@@ -3169,28 +3169,62 @@ const CNIFleetManagementUI = () => {
                 <MapPin size={18} color={colors.primary} /> GPS Location
               </h3>
               <div style={{
-                height: '200px',
-                backgroundColor: '#E8F4EA',
+                height: '250px',
                 borderRadius: '10px',
-                display: 'flex',
-                alignItems: 'center',
-                justifyContent: 'center',
+                overflow: 'hidden',
                 marginBottom: '16px',
                 position: 'relative',
+                border: `1px solid ${colors.lightGrey}`,
               }}>
-                <Map size={48} color={colors.success} />
-                <div style={{ position: 'absolute', bottom: '12px', left: '12px', backgroundColor: colors.white, padding: '8px 12px', borderRadius: '6px', fontSize: '12px' }}>
-                  📍 {v.gps.address}
-                </div>
+                <MapContainer
+                  center={[v.gps.latitude, v.gps.longitude]}
+                  zoom={15}
+                  style={{ height: '100%', width: '100%' }}
+                  scrollWheelZoom={true}
+                >
+                  <TileLayer
+                    attribution='&copy; <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a> contributors'
+                    url="https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png"
+                  />
+                  <Marker
+                    position={[v.gps.latitude, v.gps.longitude]}
+                    icon={createVehicleIcon(v.status, v.gps.speed > 0)}
+                  >
+                    <Popup>
+                      <div style={{ minWidth: '180px' }}>
+                        <div style={{ fontWeight: '700', fontSize: '14px', marginBottom: '4px', color: '#1A1A2E' }}>
+                          {v.name}
+                        </div>
+                        <div style={{ fontSize: '12px', color: '#666', marginBottom: '8px' }}>
+                          {v.id} • {v.registrationNo}
+                        </div>
+                        <div style={{ fontSize: '12px', color: '#666' }}>
+                          📍 {v.gps.address}
+                        </div>
+                        {v.gps.speed > 0 && (
+                          <div style={{ fontSize: '12px', color: '#28A745', marginTop: '4px' }}>
+                            🚗 Moving at {v.gps.speed} km/h
+                          </div>
+                        )}
+                      </div>
+                    </Popup>
+                  </Marker>
+                </MapContainer>
               </div>
-              <div style={{ display: 'grid', gridTemplateColumns: 'repeat(4, 1fr)', gap: '16px' }}>
+              <div style={{ display: 'grid', gridTemplateColumns: 'repeat(2, 1fr) repeat(3, 1fr)', gap: '16px' }}>
                 <div>
-                  <div style={{ fontSize: '11px', color: colors.mediumGrey }}>Latitude</div>
-                  <div style={{ fontSize: '14px', fontWeight: '600' }}>{v.gps.latitude}</div>
+                  <div style={{ fontSize: '11px', color: colors.mediumGrey }}>Address</div>
+                  <div style={{ fontSize: '14px', fontWeight: '600' }}>{v.gps.address}</div>
                 </div>
                 <div>
-                  <div style={{ fontSize: '11px', color: colors.mediumGrey }}>Longitude</div>
-                  <div style={{ fontSize: '14px', fontWeight: '600' }}>{v.gps.longitude}</div>
+                  <div style={{ fontSize: '11px', color: colors.mediumGrey }}>Speed</div>
+                  <div style={{ fontSize: '14px', fontWeight: '600', color: v.gps.speed > 0 ? colors.success : colors.mediumGrey }}>
+                    {v.gps.speed > 0 ? `${v.gps.speed} km/h` : 'Stationary'}
+                  </div>
+                </div>
+                <div>
+                  <div style={{ fontSize: '11px', color: colors.mediumGrey }}>Coordinates</div>
+                  <div style={{ fontSize: '14px', fontWeight: '600' }}>{v.gps.latitude.toFixed(4)}, {v.gps.longitude.toFixed(4)}</div>
                 </div>
                 <div>
                   <div style={{ fontSize: '11px', color: colors.mediumGrey }}>Heading</div>
@@ -3200,6 +3234,9 @@ const CNIFleetManagementUI = () => {
                   <div style={{ fontSize: '11px', color: colors.mediumGrey }}>Signal</div>
                   <div style={{ fontSize: '14px', fontWeight: '600', color: v.gps.signalQuality === 'Good' ? colors.success : colors.warning }}>{v.gps.signalQuality}</div>
                 </div>
+              </div>
+              <div style={{ marginTop: '12px', fontSize: '11px', color: colors.mediumGrey }}>
+                Last updated: {new Date(v.gps.lastUpdate).toLocaleString()}
               </div>
             </div>
           </div>
