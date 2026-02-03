@@ -1,13 +1,63 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import { Car, Calendar, Users, Wrench, DollarSign, BarChart3, Settings, Menu, Bell, Search, MapPin,
          ChevronRight, CheckCircle, AlertTriangle, XCircle, Plus, Filter, Download, Upload, Edit,
          Trash2, Eye, X, Clock, Phone, Mail, User, CreditCard, FileText, Camera, CheckSquare,
          AlertCircle, RefreshCw, Send, Printer, MessageSquare, CalendarDays, ChevronLeft, Check,
          Fuel, Navigation, Shield, Activity, Battery, Gauge, FileCheck, AlertOctagon,
          MoreVertical, Zap, Circle, Map, Truck } from 'lucide-react';
+import { MapContainer, TileLayer, Marker, Popup, useMap } from 'react-leaflet';
+import L from 'leaflet';
+import 'leaflet/dist/leaflet.css';
+
+// Fix for default marker icons in Leaflet with webpack/vite
+delete L.Icon.Default.prototype._getIconUrl;
+L.Icon.Default.mergeOptions({
+  iconRetinaUrl: 'https://cdnjs.cloudflare.com/ajax/libs/leaflet/1.9.4/images/marker-icon-2x.png',
+  iconUrl: 'https://cdnjs.cloudflare.com/ajax/libs/leaflet/1.9.4/images/marker-icon.png',
+  shadowUrl: 'https://cdnjs.cloudflare.com/ajax/libs/leaflet/1.9.4/images/marker-shadow.png',
+});
+
+// Custom vehicle marker icons based on status
+const createVehicleIcon = (status, isMoving) => {
+  const colors = {
+    active: '#28A745',
+    available: '#6C757D',
+    booked: '#007BFF',
+    maintenance: '#FFC107',
+    dormant: '#DC3545',
+  };
+  const color = colors[status] || colors.available;
+
+  return L.divIcon({
+    className: 'custom-vehicle-marker',
+    html: `
+      <div style="
+        width: 36px;
+        height: 36px;
+        background-color: ${color};
+        border: 3px solid white;
+        border-radius: 50%;
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        box-shadow: 0 2px 8px rgba(0,0,0,0.3);
+        ${isMoving ? 'animation: pulse 1.5s infinite;' : ''}
+      ">
+        <svg width="18" height="18" viewBox="0 0 24 24" fill="white" stroke="white" stroke-width="1">
+          <path d="M19 17h2c.6 0 1-.4 1-1v-3c0-.9-.7-1.7-1.5-1.9L18 10l-2-4H8L6 10l-2.5 1.1C2.7 11.3 2 12.1 2 13v3c0 .6.4 1 1 1h2"/>
+          <circle cx="7" cy="17" r="2"/>
+          <circle cx="17" cy="17" r="2"/>
+        </svg>
+      </div>
+    `,
+    iconSize: [36, 36],
+    iconAnchor: [18, 18],
+    popupAnchor: [0, -18],
+  });
+};
 
 const CNIFleetManagementUI = () => {
-  const [currentView, setCurrentView] = useState('bookings');
+  const [currentView, setCurrentView] = useState('showcase');
   const [sidebarOpen, setSidebarOpen] = useState(true);
   const [bookingsSubView, setBookingsSubView] = useState('list'); // list, new, details, calendar
   const [selectedBooking, setSelectedBooking] = useState(null);
@@ -21,6 +71,19 @@ const CNIFleetManagementUI = () => {
   const [selectedVehicle, setSelectedVehicle] = useState(null);
   const [fleetStatusFilter, setFleetStatusFilter] = useState('all');
   const [fleetViewMode, setFleetViewMode] = useState('grid'); // grid, table
+  const [showAddVehicleModal, setShowAddVehicleModal] = useState(false);
+  const [newVehicleForm, setNewVehicleForm] = useState({
+    name: '',
+    type: 'Sedan',
+    make: '',
+    model: '',
+    year: new Date().getFullYear(),
+    registrationNo: '',
+    color: '',
+    fuelType: 'Petrol',
+    transmission: 'Automatic',
+    seats: 5,
+  });
 
   // Showcase/Client Booking state
   const [showcaseView, setShowcaseView] = useState('browse'); // browse, vehicle, form, confirmation
@@ -215,8 +278,8 @@ const CNIFleetManagementUI = () => {
       currentBooking: 'BK-2401',
       currentClient: 'Acme Corporation',
       gps: {
-        latitude: 6.4541,
-        longitude: 3.3947,
+        latitude: 6.4281,
+        longitude: 3.4219,
         address: 'Victoria Island, Lagos',
         speed: 45,
         heading: 'NE',
@@ -263,9 +326,9 @@ const CNIFleetManagementUI = () => {
       currentBooking: null,
       currentClient: null,
       gps: {
-        latitude: 6.4356,
-        longitude: 3.4196,
-        address: 'CNI Head Office - Lekki',
+        latitude: 6.4478,
+        longitude: 3.4723,
+        address: 'Lekki Phase 1, Lagos',
         speed: 0,
         heading: '-',
         ignition: false,
@@ -310,8 +373,8 @@ const CNIFleetManagementUI = () => {
       currentBooking: 'BK-2399',
       currentClient: 'TechCo Nigeria',
       gps: {
-        latitude: 6.5244,
-        longitude: 3.3792,
+        latitude: 6.5833,
+        longitude: 3.3500,
         address: 'Ikeja GRA, Lagos',
         speed: 0,
         heading: '-',
@@ -355,8 +418,8 @@ const CNIFleetManagementUI = () => {
       currentBooking: 'BK-2398',
       currentClient: 'BuildCo Ltd',
       gps: {
-        latitude: 6.5965,
-        longitude: 3.3421,
+        latitude: 6.6318,
+        longitude: 3.3515,
         address: 'Ojodu Berger, Lagos',
         speed: 62,
         heading: 'N',
@@ -403,9 +466,9 @@ const CNIFleetManagementUI = () => {
       currentBooking: null,
       currentClient: null,
       gps: {
-        latitude: 6.4698,
-        longitude: 3.5852,
-        address: 'Mercedes Workshop - Lekki',
+        latitude: 6.4598,
+        longitude: 3.5452,
+        address: 'Ajah, Lagos',
         speed: 0,
         heading: '-',
         ignition: false,
@@ -450,9 +513,9 @@ const CNIFleetManagementUI = () => {
       currentBooking: null,
       currentClient: null,
       gps: {
-        latitude: 6.4356,
-        longitude: 3.4196,
-        address: 'CNI Head Office - Lekki',
+        latitude: 6.4983,
+        longitude: 3.3486,
+        address: 'Surulere, Lagos',
         speed: 0,
         heading: '-',
         ignition: false,
@@ -497,9 +560,9 @@ const CNIFleetManagementUI = () => {
       currentBooking: null,
       currentClient: null,
       gps: {
-        latitude: 6.4356,
-        longitude: 3.4196,
-        address: 'CNI Head Office - Lekki',
+        latitude: 6.4412,
+        longitude: 3.4089,
+        address: 'Ikoyi, Lagos',
         speed: 0,
         heading: '-',
         ignition: false,
@@ -542,9 +605,9 @@ const CNIFleetManagementUI = () => {
       currentBooking: 'BK-2405',
       currentClient: 'Shell Nigeria',
       gps: {
-        latitude: 4.7742,
-        longitude: 7.0134,
-        address: 'Port Harcourt, Rivers State',
+        latitude: 6.4550,
+        longitude: 3.3841,
+        address: 'Lagos Island, Lagos',
         speed: 55,
         heading: 'E',
         ignition: true,
@@ -2225,74 +2288,183 @@ const CNIFleetManagementUI = () => {
         ))}
       </div>
 
-      {/* Actions Bar */}
-      <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '24px' }}>
-        <div style={{ display: 'flex', gap: '12px', flex: 1 }}>
-          <div style={{
-            display: 'flex',
-            alignItems: 'center',
-            backgroundColor: colors.white,
-            border: `1px solid ${colors.lightGrey}`,
-            borderRadius: '8px',
-            padding: '10px 16px',
-            gap: '10px',
-            width: '350px',
-          }}>
-            <Search size={18} color={colors.mediumGrey} />
-            <input
-              type="text"
-              placeholder="Search by vehicle ID, name, or registration..."
-              style={{ border: 'none', outline: 'none', flex: 1, fontSize: '14px' }}
-            />
-          </div>
-
-          {/* Status Filter Tabs */}
-          <div style={{ display: 'flex', gap: '6px', backgroundColor: colors.white, padding: '6px', borderRadius: '8px', border: `1px solid ${colors.lightGrey}` }}>
-            {['all', 'available', 'active', 'booked', 'maintenance', 'dormant'].map(status => (
-              <button
-                key={status}
-                onClick={() => setFleetStatusFilter(status)}
-                style={{
-                  padding: '6px 14px',
-                  backgroundColor: fleetStatusFilter === status ? colors.primary : 'transparent',
-                  color: fleetStatusFilter === status ? colors.white : colors.mediumGrey,
-                  border: 'none',
-                  borderRadius: '6px',
-                  cursor: 'pointer',
-                  fontSize: '13px',
-                  fontWeight: '600',
-                  textTransform: 'capitalize',
-                  transition: 'all 0.2s',
-                }}
-              >
-                {status}
-              </button>
-            ))}
-          </div>
+      {/* Actions Bar - Row 1: Search and Action Buttons */}
+      <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '16px' }}>
+        <div style={{
+          display: 'flex',
+          alignItems: 'center',
+          backgroundColor: colors.white,
+          border: `1px solid ${colors.lightGrey}`,
+          borderRadius: '8px',
+          padding: '10px 16px',
+          gap: '10px',
+          width: '350px',
+        }}>
+          <Search size={18} color={colors.mediumGrey} />
+          <input
+            type="text"
+            placeholder="Search by vehicle ID, name, or registration..."
+            style={{ border: 'none', outline: 'none', flex: 1, fontSize: '14px' }}
+          />
         </div>
 
-        <div style={{ display: 'flex', gap: '12px' }}>
-          <Button
-            variant={fleetViewMode === 'grid' ? 'primary' : 'ghost'}
-            onClick={() => setFleetViewMode('grid')}
+        <div style={{ display: 'flex', gap: '10px' }}>
+          <button
+            onClick={() => {
+              // Export fleet data as CSV
+              const headers = ['ID', 'Name', 'Type', 'Registration', 'Status', 'Driver', 'Mileage', 'Fuel Level', 'Location'];
+              const csvData = fleetVehicles.map(v => [
+                v.id,
+                v.name,
+                v.type,
+                v.registrationNo,
+                v.status,
+                v.assignedDriver || 'Unassigned',
+                v.mileage,
+                v.fuelLevel + '%',
+                v.gps.address
+              ]);
+              const csvContent = [headers, ...csvData].map(row => row.join(',')).join('\n');
+              const blob = new Blob([csvContent], { type: 'text/csv' });
+              const url = URL.createObjectURL(blob);
+              const a = document.createElement('a');
+              a.href = url;
+              a.download = `fleet-export-${new Date().toISOString().split('T')[0]}.csv`;
+              a.click();
+              URL.revokeObjectURL(url);
+            }}
+            style={{
+              display: 'flex',
+              alignItems: 'center',
+              gap: '8px',
+              padding: '10px 20px',
+              backgroundColor: '#E8F5E9',
+              color: '#2E7D32',
+              border: '2px solid #4CAF50',
+              borderRadius: '8px',
+              cursor: 'pointer',
+              fontSize: '14px',
+              fontWeight: '600',
+              transition: 'all 0.2s',
+            }}
+            onMouseEnter={(e) => {
+              e.currentTarget.style.backgroundColor = '#4CAF50';
+              e.currentTarget.style.color = 'white';
+            }}
+            onMouseLeave={(e) => {
+              e.currentTarget.style.backgroundColor = '#E8F5E9';
+              e.currentTarget.style.color = '#2E7D32';
+            }}
           >
-            Grid
-          </Button>
-          <Button
-            variant={fleetViewMode === 'table' ? 'primary' : 'ghost'}
-            onClick={() => setFleetViewMode('table')}
-          >
-            Table
-          </Button>
-          <Button variant="ghost" icon={Map} onClick={() => setFleetSubView('map')}>
-            Live Map
-          </Button>
-          <Button variant="ghost" icon={Download}>
+            <Download size={16} />
             Export
-          </Button>
-          <Button icon={Plus}>
+          </button>
+          <button
+            onClick={() => setShowAddVehicleModal(true)}
+            style={{
+              display: 'flex',
+              alignItems: 'center',
+              gap: '8px',
+              padding: '10px 20px',
+              backgroundColor: colors.primary,
+              color: 'white',
+              border: '2px solid ' + colors.primary,
+              borderRadius: '8px',
+              cursor: 'pointer',
+              fontSize: '14px',
+              fontWeight: '600',
+              transition: 'all 0.2s',
+              boxShadow: '0 2px 4px rgba(31, 71, 136, 0.3)',
+            }}
+            onMouseEnter={(e) => {
+              e.currentTarget.style.backgroundColor = '#163560';
+              e.currentTarget.style.transform = 'translateY(-1px)';
+              e.currentTarget.style.boxShadow = '0 4px 8px rgba(31, 71, 136, 0.4)';
+            }}
+            onMouseLeave={(e) => {
+              e.currentTarget.style.backgroundColor = colors.primary;
+              e.currentTarget.style.transform = 'translateY(0)';
+              e.currentTarget.style.boxShadow = '0 2px 4px rgba(31, 71, 136, 0.3)';
+            }}
+          >
+            <Plus size={16} />
             Add Vehicle
-          </Button>
+          </button>
+        </div>
+      </div>
+
+      {/* Actions Bar - Row 2: View Tabs and Status Filters */}
+      <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '24px' }}>
+        {/* View Mode Tabs */}
+        <div style={{
+          display: 'flex',
+          backgroundColor: colors.white,
+          borderRadius: '10px',
+          border: `1px solid ${colors.lightGrey}`,
+          padding: '4px',
+          boxShadow: '0 1px 3px rgba(0,0,0,0.05)'
+        }}>
+          {[
+            { id: 'grid', label: 'Grid View', icon: null },
+            { id: 'table', label: 'Table View', icon: null },
+            { id: 'map', label: 'Live Map', icon: Map },
+          ].map(tab => (
+            <button
+              key={tab.id}
+              onClick={() => tab.id === 'map' ? setFleetSubView('map') : setFleetViewMode(tab.id)}
+              style={{
+                display: 'flex',
+                alignItems: 'center',
+                gap: '8px',
+                padding: '10px 20px',
+                backgroundColor: (tab.id === 'map' ? false : fleetViewMode === tab.id) ? colors.primary : 'transparent',
+                color: (tab.id === 'map' ? false : fleetViewMode === tab.id) ? colors.white : colors.darkGrey,
+                border: 'none',
+                borderRadius: '8px',
+                cursor: 'pointer',
+                fontSize: '14px',
+                fontWeight: '600',
+                transition: 'all 0.2s',
+              }}
+              onMouseEnter={(e) => {
+                if ((tab.id === 'map' ? true : fleetViewMode !== tab.id)) {
+                  e.currentTarget.style.backgroundColor = '#F0F4F8';
+                }
+              }}
+              onMouseLeave={(e) => {
+                if ((tab.id === 'map' ? true : fleetViewMode !== tab.id)) {
+                  e.currentTarget.style.backgroundColor = 'transparent';
+                }
+              }}
+            >
+              {tab.icon && <tab.icon size={16} />}
+              {tab.label}
+            </button>
+          ))}
+        </div>
+
+        {/* Status Filter Tabs */}
+        <div style={{ display: 'flex', gap: '6px', backgroundColor: colors.white, padding: '6px', borderRadius: '8px', border: `1px solid ${colors.lightGrey}` }}>
+          {['all', 'available', 'active', 'booked', 'maintenance', 'dormant'].map(status => (
+            <button
+              key={status}
+              onClick={() => setFleetStatusFilter(status)}
+              style={{
+                padding: '6px 14px',
+                backgroundColor: fleetStatusFilter === status ? colors.primary : 'transparent',
+                color: fleetStatusFilter === status ? colors.white : colors.mediumGrey,
+                border: 'none',
+                borderRadius: '6px',
+                cursor: 'pointer',
+                fontSize: '13px',
+                fontWeight: '600',
+                textTransform: 'capitalize',
+                transition: 'all 0.2s',
+              }}
+            >
+              {status}
+            </button>
+          ))}
         </div>
       </div>
 
@@ -2429,8 +2601,410 @@ const CNIFleetManagementUI = () => {
           ))}
         </div>
       )}
+
+      {/* Table View */}
+      {fleetViewMode === 'table' && (
+        <div style={{ backgroundColor: colors.white, borderRadius: '12px', border: `1px solid ${colors.lightGrey}`, overflow: 'hidden' }}>
+          <table style={{ width: '100%', borderCollapse: 'collapse' }}>
+            <thead>
+              <tr style={{ backgroundColor: '#F8FAFC', borderBottom: `1px solid ${colors.lightGrey}` }}>
+                <th style={{ padding: '14px 16px', textAlign: 'left', fontSize: '12px', fontWeight: '700', color: colors.darkGrey, textTransform: 'uppercase', letterSpacing: '0.5px' }}>Vehicle</th>
+                <th style={{ padding: '14px 16px', textAlign: 'left', fontSize: '12px', fontWeight: '700', color: colors.darkGrey, textTransform: 'uppercase', letterSpacing: '0.5px' }}>Registration</th>
+                <th style={{ padding: '14px 16px', textAlign: 'left', fontSize: '12px', fontWeight: '700', color: colors.darkGrey, textTransform: 'uppercase', letterSpacing: '0.5px' }}>Status</th>
+                <th style={{ padding: '14px 16px', textAlign: 'left', fontSize: '12px', fontWeight: '700', color: colors.darkGrey, textTransform: 'uppercase', letterSpacing: '0.5px' }}>Driver</th>
+                <th style={{ padding: '14px 16px', textAlign: 'left', fontSize: '12px', fontWeight: '700', color: colors.darkGrey, textTransform: 'uppercase', letterSpacing: '0.5px' }}>Mileage</th>
+                <th style={{ padding: '14px 16px', textAlign: 'left', fontSize: '12px', fontWeight: '700', color: colors.darkGrey, textTransform: 'uppercase', letterSpacing: '0.5px' }}>Fuel</th>
+                <th style={{ padding: '14px 16px', textAlign: 'left', fontSize: '12px', fontWeight: '700', color: colors.darkGrey, textTransform: 'uppercase', letterSpacing: '0.5px' }}>Location</th>
+                <th style={{ padding: '14px 16px', textAlign: 'center', fontSize: '12px', fontWeight: '700', color: colors.darkGrey, textTransform: 'uppercase', letterSpacing: '0.5px' }}>Actions</th>
+              </tr>
+            </thead>
+            <tbody>
+              {filteredFleet.map((vehicle, idx) => (
+                <tr
+                  key={vehicle.id}
+                  style={{
+                    borderBottom: idx < filteredFleet.length - 1 ? `1px solid ${colors.lightGrey}` : 'none',
+                    cursor: 'pointer',
+                    transition: 'background-color 0.2s',
+                  }}
+                  onMouseEnter={(e) => e.currentTarget.style.backgroundColor = '#F8FAFC'}
+                  onMouseLeave={(e) => e.currentTarget.style.backgroundColor = 'transparent'}
+                  onClick={() => { setSelectedVehicle(vehicle); setFleetSubView('details'); }}
+                >
+                  <td style={{ padding: '14px 16px' }}>
+                    <div style={{ display: 'flex', alignItems: 'center', gap: '12px' }}>
+                      <div style={{ width: '40px', height: '40px', borderRadius: '8px', backgroundColor: '#F0F4F8', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
+                        <Car size={18} color={colors.primary} />
+                      </div>
+                      <div>
+                        <div style={{ fontSize: '14px', fontWeight: '600', color: colors.darkGrey }}>{vehicle.name}</div>
+                        <div style={{ fontSize: '12px', color: colors.mediumGrey }}>{vehicle.id}</div>
+                      </div>
+                    </div>
+                  </td>
+                  <td style={{ padding: '14px 16px', fontSize: '14px', color: colors.darkGrey }}>{vehicle.registrationNo}</td>
+                  <td style={{ padding: '14px 16px' }}>
+                    <VehicleStatusBadge status={vehicle.status} />
+                  </td>
+                  <td style={{ padding: '14px 16px', fontSize: '14px', color: vehicle.assignedDriver ? colors.darkGrey : colors.mediumGrey }}>
+                    {vehicle.assignedDriver || '—'}
+                  </td>
+                  <td style={{ padding: '14px 16px', fontSize: '14px', color: colors.darkGrey }}>{vehicle.mileage.toLocaleString()} km</td>
+                  <td style={{ padding: '14px 16px' }}>
+                    <div style={{ display: 'flex', alignItems: 'center', gap: '6px' }}>
+                      <div style={{
+                        width: '40px',
+                        height: '6px',
+                        backgroundColor: '#E5E7EB',
+                        borderRadius: '3px',
+                        overflow: 'hidden'
+                      }}>
+                        <div style={{
+                          width: `${vehicle.fuelLevel}%`,
+                          height: '100%',
+                          backgroundColor: vehicle.fuelLevel < 25 ? colors.danger : vehicle.fuelLevel < 50 ? colors.warning : colors.success,
+                          borderRadius: '3px',
+                        }} />
+                      </div>
+                      <span style={{ fontSize: '12px', color: vehicle.fuelLevel < 25 ? colors.danger : colors.mediumGrey }}>{vehicle.fuelLevel}%</span>
+                    </div>
+                  </td>
+                  <td style={{ padding: '14px 16px', fontSize: '13px', color: colors.mediumGrey, maxWidth: '150px' }}>
+                    <div style={{ display: 'flex', alignItems: 'center', gap: '4px' }}>
+                      <MapPin size={12} />
+                      <span style={{ overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
+                        {vehicle.gps.address.length > 20 ? vehicle.gps.address.substring(0, 20) + '...' : vehicle.gps.address}
+                      </span>
+                    </div>
+                  </td>
+                  <td style={{ padding: '14px 16px', textAlign: 'center' }}>
+                    <button
+                      onClick={(e) => { e.stopPropagation(); setSelectedVehicle(vehicle); setFleetSubView('details'); }}
+                      style={{
+                        padding: '6px 12px',
+                        backgroundColor: `${colors.primary}15`,
+                        color: colors.primary,
+                        border: 'none',
+                        borderRadius: '6px',
+                        fontSize: '12px',
+                        fontWeight: '600',
+                        cursor: 'pointer',
+                      }}
+                    >
+                      View
+                    </button>
+                  </td>
+                </tr>
+              ))}
+            </tbody>
+          </table>
+        </div>
+      )}
     </div>
   );
+
+  // ADD VEHICLE MODAL
+  const AddVehicleModal = () => {
+    if (!showAddVehicleModal) return null;
+
+    const handleSubmit = () => {
+      // Generate a new vehicle ID
+      const newId = `LA-${String(fleetVehicles.length + 1).padStart(3, '0')}`;
+      alert(`✅ Vehicle Added Successfully!\n\nVehicle ID: ${newId}\nName: ${newVehicleForm.make} ${newVehicleForm.model} ${newVehicleForm.year}\nRegistration: ${newVehicleForm.registrationNo}\n\nThe vehicle has been added to your fleet.`);
+      setShowAddVehicleModal(false);
+      setNewVehicleForm({
+        name: '',
+        type: 'Sedan',
+        make: '',
+        model: '',
+        year: new Date().getFullYear(),
+        registrationNo: '',
+        color: '',
+        fuelType: 'Petrol',
+        transmission: 'Automatic',
+        seats: 5,
+      });
+    };
+
+    return (
+      <div style={{
+        position: 'fixed',
+        top: 0,
+        left: 0,
+        right: 0,
+        bottom: 0,
+        backgroundColor: 'rgba(0,0,0,0.5)',
+        display: 'flex',
+        alignItems: 'center',
+        justifyContent: 'center',
+        zIndex: 9999,
+      }}>
+        <div style={{
+          backgroundColor: colors.white,
+          borderRadius: '16px',
+          width: '600px',
+          maxHeight: '90vh',
+          overflow: 'auto',
+          boxShadow: '0 20px 60px rgba(0,0,0,0.3)',
+        }}>
+          {/* Header */}
+          <div style={{
+            padding: '20px 24px',
+            borderBottom: `1px solid ${colors.lightGrey}`,
+            display: 'flex',
+            justifyContent: 'space-between',
+            alignItems: 'center',
+          }}>
+            <h2 style={{ margin: 0, fontSize: '20px', fontWeight: '700', color: colors.darkGrey, display: 'flex', alignItems: 'center', gap: '10px' }}>
+              <Plus size={22} color={colors.primary} />
+              Add New Vehicle
+            </h2>
+            <button
+              onClick={() => setShowAddVehicleModal(false)}
+              style={{
+                background: 'none',
+                border: 'none',
+                cursor: 'pointer',
+                padding: '8px',
+                borderRadius: '8px',
+                display: 'flex',
+                alignItems: 'center',
+                justifyContent: 'center',
+              }}
+            >
+              <X size={20} color={colors.mediumGrey} />
+            </button>
+          </div>
+
+          {/* Form */}
+          <div style={{ padding: '24px' }}>
+            <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '16px' }}>
+              {/* Make */}
+              <div>
+                <label style={{ display: 'block', fontSize: '13px', fontWeight: '600', color: colors.darkGrey, marginBottom: '6px' }}>Make *</label>
+                <input
+                  type="text"
+                  placeholder="e.g. Toyota"
+                  value={newVehicleForm.make}
+                  onChange={(e) => setNewVehicleForm({...newVehicleForm, make: e.target.value})}
+                  style={{
+                    width: '100%',
+                    padding: '12px',
+                    border: `1px solid ${colors.lightGrey}`,
+                    borderRadius: '8px',
+                    fontSize: '14px',
+                    boxSizing: 'border-box',
+                  }}
+                />
+              </div>
+              {/* Model */}
+              <div>
+                <label style={{ display: 'block', fontSize: '13px', fontWeight: '600', color: colors.darkGrey, marginBottom: '6px' }}>Model *</label>
+                <input
+                  type="text"
+                  placeholder="e.g. Camry"
+                  value={newVehicleForm.model}
+                  onChange={(e) => setNewVehicleForm({...newVehicleForm, model: e.target.value})}
+                  style={{
+                    width: '100%',
+                    padding: '12px',
+                    border: `1px solid ${colors.lightGrey}`,
+                    borderRadius: '8px',
+                    fontSize: '14px',
+                    boxSizing: 'border-box',
+                  }}
+                />
+              </div>
+              {/* Year */}
+              <div>
+                <label style={{ display: 'block', fontSize: '13px', fontWeight: '600', color: colors.darkGrey, marginBottom: '6px' }}>Year *</label>
+                <input
+                  type="number"
+                  min="2000"
+                  max="2030"
+                  value={newVehicleForm.year}
+                  onChange={(e) => setNewVehicleForm({...newVehicleForm, year: parseInt(e.target.value)})}
+                  style={{
+                    width: '100%',
+                    padding: '12px',
+                    border: `1px solid ${colors.lightGrey}`,
+                    borderRadius: '8px',
+                    fontSize: '14px',
+                    boxSizing: 'border-box',
+                  }}
+                />
+              </div>
+              {/* Registration */}
+              <div>
+                <label style={{ display: 'block', fontSize: '13px', fontWeight: '600', color: colors.darkGrey, marginBottom: '6px' }}>Registration No *</label>
+                <input
+                  type="text"
+                  placeholder="e.g. LA-009-XYZ"
+                  value={newVehicleForm.registrationNo}
+                  onChange={(e) => setNewVehicleForm({...newVehicleForm, registrationNo: e.target.value})}
+                  style={{
+                    width: '100%',
+                    padding: '12px',
+                    border: `1px solid ${colors.lightGrey}`,
+                    borderRadius: '8px',
+                    fontSize: '14px',
+                    boxSizing: 'border-box',
+                  }}
+                />
+              </div>
+              {/* Type */}
+              <div>
+                <label style={{ display: 'block', fontSize: '13px', fontWeight: '600', color: colors.darkGrey, marginBottom: '6px' }}>Vehicle Type</label>
+                <select
+                  value={newVehicleForm.type}
+                  onChange={(e) => setNewVehicleForm({...newVehicleForm, type: e.target.value})}
+                  style={{
+                    width: '100%',
+                    padding: '12px',
+                    border: `1px solid ${colors.lightGrey}`,
+                    borderRadius: '8px',
+                    fontSize: '14px',
+                    boxSizing: 'border-box',
+                    backgroundColor: colors.white,
+                  }}
+                >
+                  <option value="Sedan">Sedan</option>
+                  <option value="SUV">SUV</option>
+                  <option value="Truck">Truck</option>
+                  <option value="Bus">Bus</option>
+                  <option value="Luxury">Luxury</option>
+                </select>
+              </div>
+              {/* Color */}
+              <div>
+                <label style={{ display: 'block', fontSize: '13px', fontWeight: '600', color: colors.darkGrey, marginBottom: '6px' }}>Color</label>
+                <input
+                  type="text"
+                  placeholder="e.g. White"
+                  value={newVehicleForm.color}
+                  onChange={(e) => setNewVehicleForm({...newVehicleForm, color: e.target.value})}
+                  style={{
+                    width: '100%',
+                    padding: '12px',
+                    border: `1px solid ${colors.lightGrey}`,
+                    borderRadius: '8px',
+                    fontSize: '14px',
+                    boxSizing: 'border-box',
+                  }}
+                />
+              </div>
+              {/* Fuel Type */}
+              <div>
+                <label style={{ display: 'block', fontSize: '13px', fontWeight: '600', color: colors.darkGrey, marginBottom: '6px' }}>Fuel Type</label>
+                <select
+                  value={newVehicleForm.fuelType}
+                  onChange={(e) => setNewVehicleForm({...newVehicleForm, fuelType: e.target.value})}
+                  style={{
+                    width: '100%',
+                    padding: '12px',
+                    border: `1px solid ${colors.lightGrey}`,
+                    borderRadius: '8px',
+                    fontSize: '14px',
+                    boxSizing: 'border-box',
+                    backgroundColor: colors.white,
+                  }}
+                >
+                  <option value="Petrol">Petrol</option>
+                  <option value="Diesel">Diesel</option>
+                  <option value="Electric">Electric</option>
+                  <option value="Hybrid">Hybrid</option>
+                </select>
+              </div>
+              {/* Transmission */}
+              <div>
+                <label style={{ display: 'block', fontSize: '13px', fontWeight: '600', color: colors.darkGrey, marginBottom: '6px' }}>Transmission</label>
+                <select
+                  value={newVehicleForm.transmission}
+                  onChange={(e) => setNewVehicleForm({...newVehicleForm, transmission: e.target.value})}
+                  style={{
+                    width: '100%',
+                    padding: '12px',
+                    border: `1px solid ${colors.lightGrey}`,
+                    borderRadius: '8px',
+                    fontSize: '14px',
+                    boxSizing: 'border-box',
+                    backgroundColor: colors.white,
+                  }}
+                >
+                  <option value="Automatic">Automatic</option>
+                  <option value="Manual">Manual</option>
+                </select>
+              </div>
+              {/* Seats */}
+              <div>
+                <label style={{ display: 'block', fontSize: '13px', fontWeight: '600', color: colors.darkGrey, marginBottom: '6px' }}>Seats</label>
+                <input
+                  type="number"
+                  min="2"
+                  max="50"
+                  value={newVehicleForm.seats}
+                  onChange={(e) => setNewVehicleForm({...newVehicleForm, seats: parseInt(e.target.value)})}
+                  style={{
+                    width: '100%',
+                    padding: '12px',
+                    border: `1px solid ${colors.lightGrey}`,
+                    borderRadius: '8px',
+                    fontSize: '14px',
+                    boxSizing: 'border-box',
+                  }}
+                />
+              </div>
+            </div>
+          </div>
+
+          {/* Footer */}
+          <div style={{
+            padding: '16px 24px',
+            borderTop: `1px solid ${colors.lightGrey}`,
+            display: 'flex',
+            justifyContent: 'flex-end',
+            gap: '12px',
+          }}>
+            <button
+              onClick={() => setShowAddVehicleModal(false)}
+              style={{
+                padding: '12px 24px',
+                backgroundColor: colors.white,
+                color: colors.darkGrey,
+                border: `1px solid ${colors.lightGrey}`,
+                borderRadius: '8px',
+                cursor: 'pointer',
+                fontSize: '14px',
+                fontWeight: '600',
+              }}
+            >
+              Cancel
+            </button>
+            <button
+              onClick={handleSubmit}
+              disabled={!newVehicleForm.make || !newVehicleForm.model || !newVehicleForm.registrationNo}
+              style={{
+                padding: '12px 24px',
+                backgroundColor: (!newVehicleForm.make || !newVehicleForm.model || !newVehicleForm.registrationNo) ? colors.lightGrey : colors.primary,
+                color: (!newVehicleForm.make || !newVehicleForm.model || !newVehicleForm.registrationNo) ? colors.mediumGrey : colors.white,
+                border: 'none',
+                borderRadius: '8px',
+                cursor: (!newVehicleForm.make || !newVehicleForm.model || !newVehicleForm.registrationNo) ? 'not-allowed' : 'pointer',
+                fontSize: '14px',
+                fontWeight: '600',
+                display: 'flex',
+                alignItems: 'center',
+                gap: '8px',
+              }}
+            >
+              <Plus size={16} />
+              Add Vehicle
+            </button>
+          </div>
+        </div>
+      </div>
+    );
+  };
 
   // FLEET VEHICLE DETAILS VIEW
   const FleetVehicleDetailsView = () => {
@@ -2749,31 +3323,61 @@ const CNIFleetManagementUI = () => {
 
           {/* Filters */}
           <div style={{ padding: '24px 40px', backgroundColor: colors.white, borderBottom: `1px solid ${colors.lightGrey}` }}>
-            <div style={{ display: 'flex', gap: '16px', alignItems: 'center' }}>
-              <span style={{ fontSize: '14px', fontWeight: '600', color: colors.darkGrey }}>Filter by:</span>
-              <select
-                value={showcaseFilter.type}
-                onChange={(e) => setShowcaseFilter({ ...showcaseFilter, type: e.target.value })}
-                style={{ padding: '10px 16px', borderRadius: '8px', border: `1px solid ${colors.lightGrey}`, fontSize: '14px' }}
-              >
-                <option value="all">All Types</option>
-                <option value="Sedan">Sedan</option>
-                <option value="SUV">SUV</option>
-                <option value="Luxury">Luxury</option>
-                <option value="Bus">Bus</option>
-                <option value="Truck">Truck</option>
-              </select>
-              <select
-                value={showcaseFilter.priceRange}
-                onChange={(e) => setShowcaseFilter({ ...showcaseFilter, priceRange: e.target.value })}
-                style={{ padding: '10px 16px', borderRadius: '8px', border: `1px solid ${colors.lightGrey}`, fontSize: '14px' }}
-              >
-                <option value="all">All Prices</option>
-                <option value="budget">Budget (Under ₦40k/day)</option>
-                <option value="mid">Mid-Range (₦40k - ₦70k/day)</option>
-                <option value="premium">Premium (Above ₦70k/day)</option>
-              </select>
-              <span style={{ marginLeft: 'auto', fontSize: '14px', color: colors.mediumGrey }}>
+            {/* Vehicle Type Filters */}
+            <div style={{ display: 'flex', gap: '12px', alignItems: 'center', marginBottom: '16px' }}>
+              <span style={{ fontSize: '13px', fontWeight: '600', color: colors.mediumGrey, minWidth: '80px' }}>Vehicle Type:</span>
+              <div style={{ display: 'flex', gap: '8px', flexWrap: 'wrap' }}>
+                {['all', 'Sedan', 'SUV', 'Luxury', 'Bus', 'Truck'].map(type => (
+                  <button
+                    key={type}
+                    onClick={() => setShowcaseFilter({ ...showcaseFilter, type })}
+                    style={{
+                      padding: '8px 18px',
+                      backgroundColor: showcaseFilter.type === type ? colors.primary : colors.white,
+                      color: showcaseFilter.type === type ? colors.white : colors.darkGrey,
+                      border: `1px solid ${showcaseFilter.type === type ? colors.primary : colors.lightGrey}`,
+                      borderRadius: '20px',
+                      cursor: 'pointer',
+                      fontSize: '13px',
+                      fontWeight: '600',
+                      transition: 'all 0.2s',
+                    }}
+                  >
+                    {type === 'all' ? 'All Types' : type}
+                  </button>
+                ))}
+              </div>
+            </div>
+            {/* Price Range Filters */}
+            <div style={{ display: 'flex', gap: '12px', alignItems: 'center' }}>
+              <span style={{ fontSize: '13px', fontWeight: '600', color: colors.mediumGrey, minWidth: '80px' }}>Price Range:</span>
+              <div style={{ display: 'flex', gap: '8px', flexWrap: 'wrap' }}>
+                {[
+                  { value: 'all', label: 'All Prices' },
+                  { value: 'budget', label: 'Budget (Under ₦40k)' },
+                  { value: 'mid', label: 'Mid-Range (₦40k - ₦70k)' },
+                  { value: 'premium', label: 'Premium (Above ₦70k)' },
+                ].map(range => (
+                  <button
+                    key={range.value}
+                    onClick={() => setShowcaseFilter({ ...showcaseFilter, priceRange: range.value })}
+                    style={{
+                      padding: '8px 18px',
+                      backgroundColor: showcaseFilter.priceRange === range.value ? colors.accent : colors.white,
+                      color: showcaseFilter.priceRange === range.value ? colors.white : colors.darkGrey,
+                      border: `1px solid ${showcaseFilter.priceRange === range.value ? colors.accent : colors.lightGrey}`,
+                      borderRadius: '20px',
+                      cursor: 'pointer',
+                      fontSize: '13px',
+                      fontWeight: '600',
+                      transition: 'all 0.2s',
+                    }}
+                  >
+                    {range.label}
+                  </button>
+                ))}
+              </div>
+              <span style={{ marginLeft: 'auto', fontSize: '14px', color: colors.mediumGrey, fontWeight: '500' }}>
                 {filteredShowcaseVehicles.length} vehicles available
               </span>
             </div>
@@ -2818,19 +3422,27 @@ const CNIFleetManagementUI = () => {
                     />
                   </div>
                   <div style={{ padding: '20px' }}>
-                    <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'start', marginBottom: '8px' }}>
-                      <span style={{ fontSize: '12px', color: colors.primary, fontWeight: '600', backgroundColor: `${colors.primary}15`, padding: '4px 10px', borderRadius: '6px' }}>
+                    <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'start', marginBottom: '10px' }}>
+                      <span style={{ fontSize: '11px', color: colors.primary, fontWeight: '700', backgroundColor: `${colors.primary}15`, padding: '5px 12px', borderRadius: '12px', textTransform: 'uppercase', letterSpacing: '0.5px' }}>
                         {vehicle.type}
                       </span>
-                      <span style={{ fontSize: '13px', color: '#FFB800', display: 'flex', alignItems: 'center', gap: '4px' }}>
+                      <span style={{ fontSize: '13px', color: '#FFB800', display: 'flex', alignItems: 'center', gap: '4px', fontWeight: '600' }}>
                         ★ {vehicle.rating}
                       </span>
                     </div>
-                    <h3 style={{ fontSize: '17px', fontWeight: '700', color: colors.darkGrey, margin: '0 0 8px 0' }}>
+                    <h3 style={{ fontSize: '17px', fontWeight: '700', color: colors.darkGrey, margin: '0 0 12px 0' }}>
                       {vehicle.name}
                     </h3>
-                    <div style={{ fontSize: '13px', color: colors.mediumGrey, marginBottom: '12px' }}>
-                      {vehicle.seats} seats • {vehicle.features.slice(0, 2).join(' • ')}
+                    {/* Feature Badges */}
+                    <div style={{ display: 'flex', flexWrap: 'wrap', gap: '6px', marginBottom: '14px' }}>
+                      <span style={{ fontSize: '11px', color: colors.darkGrey, backgroundColor: '#F0F4F8', padding: '5px 10px', borderRadius: '12px', fontWeight: '500' }}>
+                        {vehicle.seats} seats
+                      </span>
+                      {vehicle.features.slice(0, 2).map((feature, idx) => (
+                        <span key={idx} style={{ fontSize: '11px', color: colors.darkGrey, backgroundColor: '#F0F4F8', padding: '5px 10px', borderRadius: '12px', fontWeight: '500' }}>
+                          {feature}
+                        </span>
+                      ))}
                     </div>
                     <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
                       <div>
@@ -2840,7 +3452,7 @@ const CNIFleetManagementUI = () => {
                         <span style={{ fontSize: '13px', color: colors.mediumGrey }}>/day</span>
                       </div>
                       {!vehicle.available && (
-                        <span style={{ fontSize: '12px', color: colors.danger, fontWeight: '600' }}>Unavailable</span>
+                        <span style={{ fontSize: '11px', color: colors.white, backgroundColor: colors.danger, padding: '4px 10px', borderRadius: '10px', fontWeight: '600' }}>Unavailable</span>
                       )}
                     </div>
                   </div>
@@ -2877,16 +3489,25 @@ const CNIFleetManagementUI = () => {
               <div style={{ borderRadius: '16px', overflow: 'hidden', marginBottom: '24px', height: '350px', backgroundColor: '#F0F4F8' }}>
                 <img src={v.image} alt={v.name} style={{ width: '100%', height: '100%', objectFit: 'cover' }} onError={(e) => { e.target.style.display = 'none'; }} />
               </div>
-              <h1 style={{ fontSize: '28px', fontWeight: '700', color: colors.darkGrey, margin: '0 0 8px 0' }}>{v.name}</h1>
-              <div style={{ display: 'flex', gap: '16px', marginBottom: '20px' }}>
-                <span style={{ fontSize: '13px', color: colors.primary, fontWeight: '600', backgroundColor: `${colors.primary}15`, padding: '6px 14px', borderRadius: '8px' }}>{v.type}</span>
-                <span style={{ fontSize: '14px', color: '#FFB800' }}>★ {v.rating}</span>
-                <span style={{ fontSize: '14px', color: colors.mediumGrey }}>{v.seats} seats</span>
+              <h1 style={{ fontSize: '28px', fontWeight: '700', color: colors.darkGrey, margin: '0 0 16px 0' }}>{v.name}</h1>
+
+              {/* Vehicle Info Badges */}
+              <div style={{ display: 'flex', gap: '10px', marginBottom: '24px', flexWrap: 'wrap' }}>
+                <span style={{ fontSize: '12px', color: colors.primary, fontWeight: '700', backgroundColor: `${colors.primary}15`, padding: '8px 16px', borderRadius: '20px', textTransform: 'uppercase', letterSpacing: '0.5px' }}>
+                  {v.type}
+                </span>
+                <span style={{ fontSize: '13px', color: '#856404', backgroundColor: '#FFF3CD', padding: '8px 16px', borderRadius: '20px', fontWeight: '600', display: 'flex', alignItems: 'center', gap: '4px' }}>
+                  ★ {v.rating} Rating
+                </span>
+                <span style={{ fontSize: '13px', color: colors.darkGrey, backgroundColor: '#F0F4F8', padding: '8px 16px', borderRadius: '20px', fontWeight: '600' }}>
+                  {v.seats} Seats
+                </span>
               </div>
+
               <h3 style={{ fontSize: '16px', fontWeight: '600', color: colors.darkGrey, marginBottom: '12px' }}>Features</h3>
               <div style={{ display: 'flex', flexWrap: 'wrap', gap: '10px', marginBottom: '24px' }}>
                 {v.features.map((f, i) => (
-                  <span key={i} style={{ padding: '8px 16px', backgroundColor: colors.lightGrey, borderRadius: '20px', fontSize: '13px' }}>{f}</span>
+                  <span key={i} style={{ padding: '10px 18px', backgroundColor: '#F0F4F8', borderRadius: '20px', fontSize: '13px', fontWeight: '500', color: colors.darkGrey, border: `1px solid ${colors.lightGrey}` }}>{f}</span>
                 ))}
               </div>
             </div>
@@ -3057,42 +3678,100 @@ const CNIFleetManagementUI = () => {
               </div>
 
               {/* Price Breakdown */}
-              <div style={{ padding: '16px', backgroundColor: '#F8F9FA', borderRadius: '10px', marginBottom: '20px' }}>
-                <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: '10px', fontSize: '14px' }}>
-                  <span style={{ color: colors.darkGrey }}>Base ({bookingTotals.days} day{bookingTotals.days > 1 ? 's' : ''})</span>
-                  <span style={{ fontWeight: '500' }}>₦{bookingTotals.baseAmount?.toLocaleString()}</span>
+              <div style={{ marginBottom: '20px' }}>
+                <h4 style={{ fontSize: '13px', fontWeight: '700', color: colors.darkGrey, marginBottom: '12px', textTransform: 'uppercase', letterSpacing: '0.5px' }}>Price Breakdown</h4>
+
+                {/* Line Items */}
+                <div style={{ backgroundColor: '#F8FAFC', borderRadius: '12px', overflow: 'hidden', border: `1px solid ${colors.lightGrey}` }}>
+                  {/* Base */}
+                  <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', padding: '14px 16px', borderBottom: `1px solid ${colors.lightGrey}` }}>
+                    <div style={{ display: 'flex', alignItems: 'center', gap: '10px' }}>
+                      <div style={{ width: '32px', height: '32px', borderRadius: '8px', backgroundColor: `${colors.primary}15`, display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
+                        <Car size={16} color={colors.primary} />
+                      </div>
+                      <div>
+                        <div style={{ fontSize: '14px', fontWeight: '600', color: colors.darkGrey }}>Base Rental</div>
+                        <div style={{ fontSize: '12px', color: colors.mediumGrey }}>{bookingTotals.days} day{bookingTotals.days > 1 ? 's' : ''} × ₦{selectedShowcaseVehicle?.dailyRate?.toLocaleString()}</div>
+                      </div>
+                    </div>
+                    <span style={{ fontSize: '14px', fontWeight: '700', color: colors.darkGrey }}>₦{bookingTotals.baseAmount?.toLocaleString()}</span>
+                  </div>
+
+                  {/* Driver */}
+                  {bookingTotals.driverFee > 0 && (
+                    <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', padding: '14px 16px', borderBottom: `1px solid ${colors.lightGrey}` }}>
+                      <div style={{ display: 'flex', alignItems: 'center', gap: '10px' }}>
+                        <div style={{ width: '32px', height: '32px', borderRadius: '8px', backgroundColor: '#E8F5E9', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
+                          <User size={16} color="#2E7D32" />
+                        </div>
+                        <div>
+                          <div style={{ fontSize: '14px', fontWeight: '600', color: colors.darkGrey }}>Professional Driver</div>
+                          <div style={{ fontSize: '12px', color: colors.mediumGrey }}>{bookingTotals.days} day{bookingTotals.days > 1 ? 's' : ''} × ₦5,000</div>
+                        </div>
+                      </div>
+                      <span style={{ fontSize: '14px', fontWeight: '700', color: colors.darkGrey }}>₦{bookingTotals.driverFee.toLocaleString()}</span>
+                    </div>
+                  )}
+
+                  {/* Insurance */}
+                  {bookingTotals.insuranceFee > 0 && (
+                    <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', padding: '14px 16px', borderBottom: `1px solid ${colors.lightGrey}` }}>
+                      <div style={{ display: 'flex', alignItems: 'center', gap: '10px' }}>
+                        <div style={{ width: '32px', height: '32px', borderRadius: '8px', backgroundColor: '#E3F2FD', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
+                          <Shield size={16} color="#1565C0" />
+                        </div>
+                        <div>
+                          <div style={{ fontSize: '14px', fontWeight: '600', color: colors.darkGrey }}>Full Insurance</div>
+                          <div style={{ fontSize: '12px', color: colors.mediumGrey }}>{bookingTotals.days} day{bookingTotals.days > 1 ? 's' : ''} × ₦2,500</div>
+                        </div>
+                      </div>
+                      <span style={{ fontSize: '14px', fontWeight: '700', color: colors.darkGrey }}>₦{bookingTotals.insuranceFee.toLocaleString()}</span>
+                    </div>
+                  )}
+
+                  {/* Fuel */}
+                  {bookingTotals.fuelFee > 0 && (
+                    <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', padding: '14px 16px', borderBottom: `1px solid ${colors.lightGrey}` }}>
+                      <div style={{ display: 'flex', alignItems: 'center', gap: '10px' }}>
+                        <div style={{ width: '32px', height: '32px', borderRadius: '8px', backgroundColor: '#FFF3E0', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
+                          <Fuel size={16} color="#E65100" />
+                        </div>
+                        <div>
+                          <div style={{ fontSize: '14px', fontWeight: '600', color: colors.darkGrey }}>Full Fuel Tank</div>
+                          <div style={{ fontSize: '12px', color: colors.mediumGrey }}>One-time charge</div>
+                        </div>
+                      </div>
+                      <span style={{ fontSize: '14px', fontWeight: '700', color: colors.darkGrey }}>₦{bookingTotals.fuelFee.toLocaleString()}</span>
+                    </div>
+                  )}
+
+                  {/* GPS */}
+                  {bookingTotals.gpsFee > 0 && (
+                    <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', padding: '14px 16px', borderBottom: `1px solid ${colors.lightGrey}` }}>
+                      <div style={{ display: 'flex', alignItems: 'center', gap: '10px' }}>
+                        <div style={{ width: '32px', height: '32px', borderRadius: '8px', backgroundColor: '#F3E5F5', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
+                          <Navigation size={16} color="#7B1FA2" />
+                        </div>
+                        <div>
+                          <div style={{ fontSize: '14px', fontWeight: '600', color: colors.darkGrey }}>GPS Navigation</div>
+                          <div style={{ fontSize: '12px', color: colors.mediumGrey }}>{bookingTotals.days} day{bookingTotals.days > 1 ? 's' : ''} × ₦1,000</div>
+                        </div>
+                      </div>
+                      <span style={{ fontSize: '14px', fontWeight: '700', color: colors.darkGrey }}>₦{bookingTotals.gpsFee.toLocaleString()}</span>
+                    </div>
+                  )}
+
+                  {/* VAT */}
+                  <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', padding: '12px 16px', backgroundColor: '#FAFAFA' }}>
+                    <span style={{ fontSize: '13px', color: colors.mediumGrey }}>VAT (7.5%)</span>
+                    <span style={{ fontSize: '13px', color: colors.mediumGrey }}>₦{bookingTotals.vat?.toLocaleString()}</span>
+                  </div>
                 </div>
-                {bookingTotals.driverFee > 0 && (
-                  <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: '10px', fontSize: '14px' }}>
-                    <span style={{ color: colors.darkGrey }}>Driver</span>
-                    <span style={{ fontWeight: '500' }}>₦{bookingTotals.driverFee.toLocaleString()}</span>
-                  </div>
-                )}
-                {bookingTotals.insuranceFee > 0 && (
-                  <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: '10px', fontSize: '14px' }}>
-                    <span style={{ color: colors.darkGrey }}>Insurance</span>
-                    <span style={{ fontWeight: '500' }}>₦{bookingTotals.insuranceFee.toLocaleString()}</span>
-                  </div>
-                )}
-                {bookingTotals.fuelFee > 0 && (
-                  <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: '10px', fontSize: '14px' }}>
-                    <span style={{ color: colors.darkGrey }}>Full Fuel Tank</span>
-                    <span style={{ fontWeight: '500' }}>₦{bookingTotals.fuelFee.toLocaleString()}</span>
-                  </div>
-                )}
-                {bookingTotals.gpsFee > 0 && (
-                  <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: '10px', fontSize: '14px' }}>
-                    <span style={{ color: colors.darkGrey }}>GPS Navigation</span>
-                    <span style={{ fontWeight: '500' }}>₦{bookingTotals.gpsFee.toLocaleString()}</span>
-                  </div>
-                )}
-                <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: '10px', fontSize: '14px', color: colors.mediumGrey }}>
-                  <span>VAT (7.5%)</span>
-                  <span>₦{bookingTotals.vat?.toLocaleString()}</span>
-                </div>
-                <div style={{ display: 'flex', justifyContent: 'space-between', fontWeight: '700', fontSize: '18px', paddingTop: '12px', marginTop: '8px', borderTop: `1px solid ${colors.lightGrey}` }}>
-                  <span>Total</span>
-                  <span style={{ color: colors.primary }}>₦{bookingTotals.total?.toLocaleString()}</span>
+
+                {/* Total */}
+                <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', padding: '16px', marginTop: '12px', backgroundColor: `${colors.primary}10`, borderRadius: '12px', border: `2px solid ${colors.primary}` }}>
+                  <span style={{ fontSize: '16px', fontWeight: '700', color: colors.darkGrey }}>Total Amount</span>
+                  <span style={{ fontSize: '22px', fontWeight: '800', color: colors.primary }}>₦{bookingTotals.total?.toLocaleString()}</span>
                 </div>
               </div>
 
@@ -3136,36 +3815,99 @@ const CNIFleetManagementUI = () => {
 
               {/* Price Breakdown */}
               <div style={{ borderTop: `1px solid ${colors.lightGrey}`, paddingTop: '16px' }}>
-                <h4 style={{ fontSize: '14px', fontWeight: '600', marginBottom: '12px', color: colors.darkGrey }}>Price Breakdown</h4>
-                <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: '8px', fontSize: '14px' }}>
-                  <span>Base ({bookingTotals.days} day{bookingTotals.days > 1 ? 's' : ''})</span>
-                  <span>₦{bookingTotals.baseAmount?.toLocaleString()}</span>
+                <h4 style={{ fontSize: '13px', fontWeight: '700', color: colors.darkGrey, marginBottom: '12px', textTransform: 'uppercase', letterSpacing: '0.5px' }}>Price Breakdown</h4>
+
+                {/* Line Items */}
+                <div style={{ backgroundColor: colors.white, borderRadius: '12px', overflow: 'hidden', border: `1px solid ${colors.lightGrey}` }}>
+                  {/* Base */}
+                  <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', padding: '12px 14px', borderBottom: `1px solid ${colors.lightGrey}` }}>
+                    <div style={{ display: 'flex', alignItems: 'center', gap: '10px' }}>
+                      <div style={{ width: '28px', height: '28px', borderRadius: '6px', backgroundColor: `${colors.primary}15`, display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
+                        <Car size={14} color={colors.primary} />
+                      </div>
+                      <div>
+                        <div style={{ fontSize: '13px', fontWeight: '600', color: colors.darkGrey }}>Base Rental</div>
+                        <div style={{ fontSize: '11px', color: colors.mediumGrey }}>{bookingTotals.days} day{bookingTotals.days > 1 ? 's' : ''} × ₦{selectedShowcaseVehicle?.dailyRate?.toLocaleString()}</div>
+                      </div>
+                    </div>
+                    <span style={{ fontSize: '13px', fontWeight: '700', color: colors.darkGrey }}>₦{bookingTotals.baseAmount?.toLocaleString()}</span>
+                  </div>
+
+                  {/* Driver */}
+                  {bookingTotals.driverFee > 0 && (
+                    <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', padding: '12px 14px', borderBottom: `1px solid ${colors.lightGrey}` }}>
+                      <div style={{ display: 'flex', alignItems: 'center', gap: '10px' }}>
+                        <div style={{ width: '28px', height: '28px', borderRadius: '6px', backgroundColor: '#E8F5E9', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
+                          <User size={14} color="#2E7D32" />
+                        </div>
+                        <div>
+                          <div style={{ fontSize: '13px', fontWeight: '600', color: colors.darkGrey }}>Professional Driver</div>
+                          <div style={{ fontSize: '11px', color: colors.mediumGrey }}>{bookingTotals.days} day{bookingTotals.days > 1 ? 's' : ''} × ₦5,000</div>
+                        </div>
+                      </div>
+                      <span style={{ fontSize: '13px', fontWeight: '700', color: colors.darkGrey }}>₦{bookingTotals.driverFee.toLocaleString()}</span>
+                    </div>
+                  )}
+
+                  {/* Insurance */}
+                  {bookingTotals.insuranceFee > 0 && (
+                    <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', padding: '12px 14px', borderBottom: `1px solid ${colors.lightGrey}` }}>
+                      <div style={{ display: 'flex', alignItems: 'center', gap: '10px' }}>
+                        <div style={{ width: '28px', height: '28px', borderRadius: '6px', backgroundColor: '#E3F2FD', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
+                          <Shield size={14} color="#1565C0" />
+                        </div>
+                        <div>
+                          <div style={{ fontSize: '13px', fontWeight: '600', color: colors.darkGrey }}>Full Insurance</div>
+                          <div style={{ fontSize: '11px', color: colors.mediumGrey }}>{bookingTotals.days} day{bookingTotals.days > 1 ? 's' : ''} × ₦2,500</div>
+                        </div>
+                      </div>
+                      <span style={{ fontSize: '13px', fontWeight: '700', color: colors.darkGrey }}>₦{bookingTotals.insuranceFee.toLocaleString()}</span>
+                    </div>
+                  )}
+
+                  {/* Fuel */}
+                  {bookingTotals.fuelFee > 0 && (
+                    <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', padding: '12px 14px', borderBottom: `1px solid ${colors.lightGrey}` }}>
+                      <div style={{ display: 'flex', alignItems: 'center', gap: '10px' }}>
+                        <div style={{ width: '28px', height: '28px', borderRadius: '6px', backgroundColor: '#FFF3E0', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
+                          <Fuel size={14} color="#E65100" />
+                        </div>
+                        <div>
+                          <div style={{ fontSize: '13px', fontWeight: '600', color: colors.darkGrey }}>Full Fuel Tank</div>
+                          <div style={{ fontSize: '11px', color: colors.mediumGrey }}>One-time charge</div>
+                        </div>
+                      </div>
+                      <span style={{ fontSize: '13px', fontWeight: '700', color: colors.darkGrey }}>₦{bookingTotals.fuelFee.toLocaleString()}</span>
+                    </div>
+                  )}
+
+                  {/* GPS */}
+                  {bookingTotals.gpsFee > 0 && (
+                    <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', padding: '12px 14px', borderBottom: `1px solid ${colors.lightGrey}` }}>
+                      <div style={{ display: 'flex', alignItems: 'center', gap: '10px' }}>
+                        <div style={{ width: '28px', height: '28px', borderRadius: '6px', backgroundColor: '#F3E5F5', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
+                          <Navigation size={14} color="#7B1FA2" />
+                        </div>
+                        <div>
+                          <div style={{ fontSize: '13px', fontWeight: '600', color: colors.darkGrey }}>GPS Navigation</div>
+                          <div style={{ fontSize: '11px', color: colors.mediumGrey }}>{bookingTotals.days} day{bookingTotals.days > 1 ? 's' : ''} × ₦1,000</div>
+                        </div>
+                      </div>
+                      <span style={{ fontSize: '13px', fontWeight: '700', color: colors.darkGrey }}>₦{bookingTotals.gpsFee.toLocaleString()}</span>
+                    </div>
+                  )}
+
+                  {/* VAT */}
+                  <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', padding: '10px 14px', backgroundColor: '#FAFAFA' }}>
+                    <span style={{ fontSize: '12px', color: colors.mediumGrey }}>VAT (7.5%)</span>
+                    <span style={{ fontSize: '12px', color: colors.mediumGrey }}>₦{bookingTotals.vat?.toLocaleString()}</span>
+                  </div>
                 </div>
-                {bookingTotals.driverFee > 0 && (
-                  <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: '8px', fontSize: '14px' }}>
-                    <span>Driver</span><span>₦{bookingTotals.driverFee.toLocaleString()}</span>
-                  </div>
-                )}
-                {bookingTotals.insuranceFee > 0 && (
-                  <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: '8px', fontSize: '14px' }}>
-                    <span>Insurance</span><span>₦{bookingTotals.insuranceFee.toLocaleString()}</span>
-                  </div>
-                )}
-                {bookingTotals.fuelFee > 0 && (
-                  <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: '8px', fontSize: '14px' }}>
-                    <span>Full Fuel Tank</span><span>₦{bookingTotals.fuelFee.toLocaleString()}</span>
-                  </div>
-                )}
-                {bookingTotals.gpsFee > 0 && (
-                  <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: '8px', fontSize: '14px' }}>
-                    <span>GPS Navigation</span><span>₦{bookingTotals.gpsFee.toLocaleString()}</span>
-                  </div>
-                )}
-                <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: '8px', fontSize: '14px', color: colors.mediumGrey }}>
-                  <span>VAT (7.5%)</span><span>₦{bookingTotals.vat?.toLocaleString()}</span>
-                </div>
-                <div style={{ display: 'flex', justifyContent: 'space-between', fontWeight: '700', fontSize: '18px', paddingTop: '12px', marginTop: '8px', borderTop: `1px solid ${colors.lightGrey}` }}>
-                  <span>Total</span><span style={{ color: colors.primary }}>₦{bookingTotals.total?.toLocaleString()}</span>
+
+                {/* Total */}
+                <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', padding: '14px 16px', marginTop: '12px', backgroundColor: `${colors.primary}10`, borderRadius: '12px', border: `2px solid ${colors.primary}` }}>
+                  <span style={{ fontSize: '15px', fontWeight: '700', color: colors.darkGrey }}>Total Amount</span>
+                  <span style={{ fontSize: '20px', fontWeight: '800', color: colors.primary }}>₦{bookingTotals.total?.toLocaleString()}</span>
                 </div>
               </div>
             </div>
@@ -3195,156 +3937,209 @@ const CNIFleetManagementUI = () => {
   };
 
   // FLEET LIVE MAP VIEW
-  const FleetLiveMapView = () => (
-    <div style={{ padding: '32px' }}>
-      {/* Header */}
-      <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '24px' }}>
-        <button
-          onClick={() => setFleetSubView('list')}
-          style={{
-            display: 'flex',
-            alignItems: 'center',
-            gap: '8px',
-            padding: '10px 20px',
-            backgroundColor: colors.white,
-            border: `1px solid ${colors.lightGrey}`,
-            borderRadius: '8px',
-            cursor: 'pointer',
-            fontSize: '14px',
-            fontWeight: '600',
-            color: colors.darkGrey,
-          }}
-        >
-          <ChevronLeft size={18} />
-          Back to Fleet
-        </button>
-        <h2 style={{ fontSize: '22px', fontWeight: '700', color: colors.darkGrey, margin: 0, display: 'flex', alignItems: 'center', gap: '10px' }}>
-          <Map size={24} color={colors.primary} />
-          Live Fleet Map
-        </h2>
-        <div style={{ display: 'flex', gap: '12px' }}>
-          <Button variant="ghost" icon={RefreshCw}>Refresh</Button>
-          <Button variant="ghost" icon={Filter}>Filter</Button>
-        </div>
-      </div>
+  const FleetLiveMapView = () => {
+    // Lagos center coordinates
+    const lagosCenter = [6.5244, 3.3792];
 
-      {/* Map Container */}
-      <div style={{ display: 'grid', gridTemplateColumns: '1fr 350px', gap: '24px' }}>
-        {/* Map Placeholder */}
-        <div style={{
-          backgroundColor: colors.white,
-          borderRadius: '16px',
-          overflow: 'hidden',
-          border: `1px solid ${colors.lightGrey}`,
-          height: 'calc(100vh - 220px)',
-          position: 'relative',
-        }}>
+    return (
+      <div style={{ padding: '32px' }}>
+        {/* Header */}
+        <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '24px' }}>
+          <button
+            onClick={() => setFleetSubView('list')}
+            style={{
+              display: 'flex',
+              alignItems: 'center',
+              gap: '8px',
+              padding: '10px 20px',
+              backgroundColor: colors.white,
+              border: `1px solid ${colors.lightGrey}`,
+              borderRadius: '8px',
+              cursor: 'pointer',
+              fontSize: '14px',
+              fontWeight: '600',
+              color: colors.darkGrey,
+            }}
+          >
+            <ChevronLeft size={18} />
+            Back to Fleet
+          </button>
+          <h2 style={{ fontSize: '22px', fontWeight: '700', color: colors.darkGrey, margin: 0, display: 'flex', alignItems: 'center', gap: '10px' }}>
+            <Map size={24} color={colors.primary} />
+            Live Fleet Map
+          </h2>
+          <div style={{ display: 'flex', gap: '12px' }}>
+            <Button variant="ghost" icon={RefreshCw}>Refresh</Button>
+            <Button variant="ghost" icon={Filter}>Filter</Button>
+          </div>
+        </div>
+
+        {/* Map Container */}
+        <div style={{ display: 'grid', gridTemplateColumns: '1fr 350px', gap: '24px' }}>
+          {/* Actual Leaflet Map */}
           <div style={{
-            height: '100%',
-            backgroundColor: '#E8F4EA',
-            display: 'flex',
-            alignItems: 'center',
-            justifyContent: 'center',
-            flexDirection: 'column',
-            gap: '16px',
+            backgroundColor: colors.white,
+            borderRadius: '16px',
+            overflow: 'hidden',
+            border: `1px solid ${colors.lightGrey}`,
+            height: 'calc(100vh - 220px)',
+            position: 'relative',
           }}>
-            <Map size={80} color={colors.success} />
-            <div style={{ fontSize: '18px', fontWeight: '600', color: colors.darkGrey }}>
-              Google Maps Integration
-            </div>
-            <div style={{ fontSize: '14px', color: colors.mediumGrey }}>
-              Connect Ganoli GPS API to display live vehicle locations
+            <MapContainer
+              center={lagosCenter}
+              zoom={12}
+              style={{ height: '100%', width: '100%' }}
+              scrollWheelZoom={true}
+            >
+              <TileLayer
+                attribution='&copy; <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a> contributors'
+                url="https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png"
+              />
+              {fleetVehicles.map(vehicle => (
+                <Marker
+                  key={vehicle.id}
+                  position={[vehicle.gps.latitude, vehicle.gps.longitude]}
+                  icon={createVehicleIcon(vehicle.status, vehicle.gps.speed > 0)}
+                >
+                  <Popup>
+                    <div style={{ minWidth: '200px' }}>
+                      <div style={{ fontWeight: '700', fontSize: '14px', marginBottom: '4px', color: '#1A1A2E' }}>
+                        {vehicle.name}
+                      </div>
+                      <div style={{ fontSize: '12px', color: '#666', marginBottom: '8px' }}>
+                        {vehicle.id} • {vehicle.registrationNo}
+                      </div>
+                      <div style={{
+                        display: 'inline-block',
+                        padding: '3px 8px',
+                        borderRadius: '4px',
+                        fontSize: '11px',
+                        fontWeight: '600',
+                        textTransform: 'uppercase',
+                        backgroundColor: vehicle.status === 'active' ? '#D4EDDA' :
+                                        vehicle.status === 'available' ? '#E9ECEF' :
+                                        vehicle.status === 'booked' ? '#CCE5FF' :
+                                        vehicle.status === 'maintenance' ? '#FFF3CD' : '#F8D7DA',
+                        color: vehicle.status === 'active' ? '#155724' :
+                               vehicle.status === 'available' ? '#495057' :
+                               vehicle.status === 'booked' ? '#004085' :
+                               vehicle.status === 'maintenance' ? '#856404' : '#721C24',
+                        marginBottom: '8px'
+                      }}>
+                        {vehicle.status}
+                      </div>
+                      <div style={{ fontSize: '12px', color: '#666', marginBottom: '4px' }}>
+                        📍 {vehicle.gps.address}
+                      </div>
+                      {vehicle.gps.speed > 0 && (
+                        <div style={{ fontSize: '12px', color: '#28A745', marginBottom: '4px' }}>
+                          🚗 Moving at {vehicle.gps.speed} km/h • Heading {vehicle.gps.heading}
+                        </div>
+                      )}
+                      {vehicle.assignedDriver && (
+                        <div style={{ fontSize: '12px', color: '#666', marginBottom: '4px' }}>
+                          👤 Driver: {vehicle.assignedDriver}
+                        </div>
+                      )}
+                      <div style={{ fontSize: '11px', color: '#999', marginTop: '8px' }}>
+                        Last update: {new Date(vehicle.gps.lastUpdate).toLocaleString()}
+                      </div>
+                    </div>
+                  </Popup>
+                </Marker>
+              ))}
+            </MapContainer>
+
+            {/* Map Legend */}
+            <div style={{
+              position: 'absolute',
+              bottom: '20px',
+              left: '20px',
+              backgroundColor: colors.white,
+              padding: '16px',
+              borderRadius: '10px',
+              boxShadow: '0 2px 8px rgba(0,0,0,0.15)',
+              zIndex: 1000,
+            }}>
+              <div style={{ fontSize: '12px', fontWeight: '600', marginBottom: '12px' }}>LEGEND</div>
+              <div style={{ display: 'flex', flexDirection: 'column', gap: '8px' }}>
+                {[
+                  { color: '#28A745', label: 'Active (Moving)' },
+                  { color: '#007BFF', label: 'Booked' },
+                  { color: '#6C757D', label: 'Available (Parked)' },
+                  { color: '#FFC107', label: 'Maintenance' },
+                  { color: '#DC3545', label: 'Dormant' },
+                ].map((item, idx) => (
+                  <div key={idx} style={{ display: 'flex', alignItems: 'center', gap: '8px', fontSize: '12px' }}>
+                    <div style={{ width: '12px', height: '12px', borderRadius: '50%', backgroundColor: item.color, border: '2px solid white', boxShadow: '0 1px 3px rgba(0,0,0,0.3)' }} />
+                    {item.label}
+                  </div>
+                ))}
+              </div>
             </div>
           </div>
 
-          {/* Map Legend */}
+          {/* Vehicle List Panel */}
           <div style={{
-            position: 'absolute',
-            bottom: '20px',
-            left: '20px',
             backgroundColor: colors.white,
-            padding: '16px',
-            borderRadius: '10px',
-            boxShadow: '0 2px 8px rgba(0,0,0,0.15)',
+            borderRadius: '16px',
+            border: `1px solid ${colors.lightGrey}`,
+            overflow: 'hidden',
           }}>
-            <div style={{ fontSize: '12px', fontWeight: '600', marginBottom: '12px' }}>LEGEND</div>
-            <div style={{ display: 'flex', flexDirection: 'column', gap: '8px' }}>
-              {[
-                { color: colors.success, label: 'Active (Moving)' },
-                { color: colors.info, label: 'Booked' },
-                { color: '#6C757D', label: 'Available (Parked)' },
-                { color: colors.warning, label: 'Maintenance' },
-                { color: '#DC3545', label: 'Alert' },
-              ].map((item, idx) => (
-                <div key={idx} style={{ display: 'flex', alignItems: 'center', gap: '8px', fontSize: '12px' }}>
-                  <div style={{ width: '10px', height: '10px', borderRadius: '50%', backgroundColor: item.color }} />
-                  {item.label}
+            <div style={{ padding: '16px', borderBottom: `1px solid ${colors.lightGrey}` }}>
+              <h3 style={{ fontSize: '15px', fontWeight: '700', margin: 0, color: colors.darkGrey }}>
+                Fleet Vehicles ({fleetVehicles.length})
+              </h3>
+            </div>
+            <div style={{ maxHeight: 'calc(100vh - 310px)', overflowY: 'auto' }}>
+              {fleetVehicles.map(vehicle => (
+                <div
+                  key={vehicle.id}
+                  onClick={() => {
+                    setSelectedVehicle(vehicle);
+                    setFleetSubView('details');
+                  }}
+                  style={{
+                    padding: '14px 16px',
+                    borderBottom: `1px solid ${colors.lightGrey}`,
+                    cursor: 'pointer',
+                    transition: 'background-color 0.2s',
+                  }}
+                  onMouseEnter={(e) => e.currentTarget.style.backgroundColor = '#F8F9FA'}
+                  onMouseLeave={(e) => e.currentTarget.style.backgroundColor = 'transparent'}
+                >
+                  <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'start', marginBottom: '6px' }}>
+                    <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
+                      <div style={{
+                        width: '8px',
+                        height: '8px',
+                        borderRadius: '50%',
+                        backgroundColor: vehicle.gps.ignition ? colors.success : colors.mediumGrey,
+                      }} />
+                      <span style={{ fontSize: '11px', fontWeight: '700', color: colors.primary }}>{vehicle.id}</span>
+                    </div>
+                    <VehicleStatusBadge status={vehicle.status} />
+                  </div>
+                  <div style={{ fontSize: '14px', fontWeight: '600', color: colors.darkGrey, marginBottom: '4px' }}>
+                    {vehicle.name}
+                  </div>
+                  <div style={{ fontSize: '12px', color: colors.mediumGrey, display: 'flex', alignItems: 'center', gap: '4px' }}>
+                    <MapPin size={11} />
+                    {vehicle.gps.address}
+                  </div>
+                  {vehicle.gps.speed > 0 && (
+                    <div style={{ fontSize: '11px', color: colors.success, marginTop: '4px' }}>
+                      Moving at {vehicle.gps.speed} km/h • Heading {vehicle.gps.heading}
+                    </div>
+                  )}
                 </div>
               ))}
             </div>
           </div>
         </div>
-
-        {/* Vehicle List Panel */}
-        <div style={{
-          backgroundColor: colors.white,
-          borderRadius: '16px',
-          border: `1px solid ${colors.lightGrey}`,
-          overflow: 'hidden',
-        }}>
-          <div style={{ padding: '16px', borderBottom: `1px solid ${colors.lightGrey}` }}>
-            <h3 style={{ fontSize: '15px', fontWeight: '700', margin: 0, color: colors.darkGrey }}>
-              Fleet Vehicles ({fleetVehicles.length})
-            </h3>
-          </div>
-          <div style={{ maxHeight: 'calc(100vh - 310px)', overflowY: 'auto' }}>
-            {fleetVehicles.map(vehicle => (
-              <div
-                key={vehicle.id}
-                onClick={() => {
-                  setSelectedVehicle(vehicle);
-                  setFleetSubView('details');
-                }}
-                style={{
-                  padding: '14px 16px',
-                  borderBottom: `1px solid ${colors.lightGrey}`,
-                  cursor: 'pointer',
-                  transition: 'background-color 0.2s',
-                }}
-                onMouseEnter={(e) => e.currentTarget.style.backgroundColor = '#F8F9FA'}
-                onMouseLeave={(e) => e.currentTarget.style.backgroundColor = 'transparent'}
-              >
-                <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'start', marginBottom: '6px' }}>
-                  <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
-                    <div style={{
-                      width: '8px',
-                      height: '8px',
-                      borderRadius: '50%',
-                      backgroundColor: vehicle.gps.ignition ? colors.success : colors.mediumGrey,
-                    }} />
-                    <span style={{ fontSize: '11px', fontWeight: '700', color: colors.primary }}>{vehicle.id}</span>
-                  </div>
-                  <VehicleStatusBadge status={vehicle.status} />
-                </div>
-                <div style={{ fontSize: '14px', fontWeight: '600', color: colors.darkGrey, marginBottom: '4px' }}>
-                  {vehicle.name}
-                </div>
-                <div style={{ fontSize: '12px', color: colors.mediumGrey, display: 'flex', alignItems: 'center', gap: '4px' }}>
-                  <MapPin size={11} />
-                  {vehicle.gps.address}
-                </div>
-                {vehicle.gps.speed > 0 && (
-                  <div style={{ fontSize: '11px', color: colors.success, marginTop: '4px' }}>
-                    Moving at {vehicle.gps.speed} km/h • Heading {vehicle.gps.heading}
-                  </div>
-                )}
-              </div>
-            ))}
-          </div>
-        </div>
       </div>
-    </div>
-  );
+    );
+  };
 
   // Main render
   return (
@@ -3415,6 +4210,7 @@ const CNIFleetManagementUI = () => {
       </div>
       {/* Modals */}
       <SuccessModal />
+      <AddVehicleModal />
     </div>
   );
 };
