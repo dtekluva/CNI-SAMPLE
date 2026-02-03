@@ -22,6 +22,29 @@ const CNIFleetManagementUI = () => {
   const [fleetStatusFilter, setFleetStatusFilter] = useState('all');
   const [fleetViewMode, setFleetViewMode] = useState('grid'); // grid, table
 
+  // Showcase/Client Booking state
+  const [showcaseView, setShowcaseView] = useState('browse'); // browse, vehicle, form, confirmation
+  const [selectedShowcaseVehicle, setSelectedShowcaseVehicle] = useState(null);
+  const [showcaseFilter, setShowcaseFilter] = useState({ type: 'all', priceRange: 'all' });
+  const [clientBooking, setClientBooking] = useState({
+    pickupDate: '',
+    returnDate: '',
+    withDriver: true,
+    withInsurance: true,
+    withFuel: true,
+    withGPS: false,
+    customerName: '',
+    customerEmail: '',
+    customerPhone: '',
+    customerCompany: '',
+    pickupLocation: '',
+    returnLocation: '',
+    pickupTime: '09:00',
+    returnTime: '09:00',
+    notes: '',
+  });
+  const [bookingReference, setBookingReference] = useState('');
+
   // Enhanced booking form state
   const [bookingForm, setBookingForm] = useState({
     customer: null,
@@ -558,6 +581,45 @@ const CNIFleetManagementUI = () => {
     ? fleetVehicles
     : fleetVehicles.filter(v => v.status === fleetStatusFilter);
 
+  // Showcase vehicles for client booking
+  const showcaseVehicles = [
+    { id: 'SV-001', name: 'Toyota Camry 2023', type: 'Sedan', seats: 5, rating: 4.8, dailyRate: 35000, image: 'https://pictures-nigeria.jijistatic.net/159042428_MzAwLTQwMC1jOWRjOWNmNThi.webp', available: true, features: ['AC', 'Bluetooth', 'USB Charging', 'Leather Seats'] },
+    { id: 'SV-002', name: 'Honda Accord 2022', type: 'Sedan', seats: 5, rating: 4.7, dailyRate: 32000, image: 'https://pictures-nigeria.jijistatic.net/183129966_MzAwLTQwMC1jYzYzNTFiODY4.webp', available: true, features: ['AC', 'Bluetooth', 'Sunroof', 'Backup Camera'] },
+    { id: 'SV-003', name: 'Mercedes E-Class 2024', type: 'Luxury', seats: 5, rating: 4.9, dailyRate: 85000, image: 'https://pictures-nigeria.jijistatic.net/164741821_MzAwLTI5Ni01MTYxZWIwZWIy.webp', available: true, features: ['AC', 'Premium Sound', 'Massage Seats', 'WiFi'] },
+    { id: 'SV-004', name: 'BMW 5 Series 2024', type: 'Luxury', seats: 5, rating: 4.9, dailyRate: 90000, image: 'https://pictures-nigeria.jijistatic.net/168672548_MzAwLTQwMC1jZGZlMjYxODE2.webp', available: false, features: ['AC', 'Premium Sound', 'Heads-up Display', 'Adaptive Cruise'] },
+    { id: 'SV-005', name: 'Toyota Prado 2023', type: 'SUV', seats: 7, rating: 4.8, dailyRate: 65000, image: 'https://pictures-nigeria.jijistatic.net/161934706_MzAwLTIyNS0zMGNjYTdiYzQ0.webp', available: true, features: ['AC', '4WD', 'Third Row Seating', 'Roof Rack'] },
+    { id: 'SV-006', name: 'Lexus RX350 2024', type: 'SUV', seats: 5, rating: 4.9, dailyRate: 75000, image: 'https://pictures-nigeria.jijistatic.net/170881954_MzAwLTM1Ny0zMjFkZjBjY2Qy.webp', available: true, features: ['AC', 'Premium Sound', 'Panoramic Roof', 'Ventilated Seats'] },
+    { id: 'SV-007', name: 'Toyota Hiace 2023', type: 'Bus', seats: 14, rating: 4.6, dailyRate: 55000, image: 'https://pictures-nigeria.jijistatic.net/175680214_MzAwLTUzMy0xYWFhNjNkMDAx.webp', available: true, features: ['AC', 'PA System', 'Luggage Space', 'Reclining Seats'] },
+    { id: 'SV-008', name: 'Toyota Hilux 2023', type: 'Truck', seats: 5, rating: 4.7, dailyRate: 45000, image: 'https://pictures-nigeria.jijistatic.net/168676255_MzAwLTM1Ni02YjY3ZDE4YTAy.webp', available: true, features: ['AC', '4WD', 'Tow Package', 'Bed Liner'] },
+    { id: 'SV-009', name: 'Toyota Corolla 2023', type: 'Sedan', seats: 5, rating: 4.6, dailyRate: 28000, image: 'https://pictures-nigeria.jijistatic.net/160873070_MzAwLTQwMC02NDQxNmQ3MGU0.webp', available: true, features: ['AC', 'Bluetooth', 'Fuel Efficient', 'Apple CarPlay'] },
+    { id: 'SV-010', name: 'Range Rover Sport 2024', type: 'Luxury', seats: 5, rating: 5.0, dailyRate: 150000, image: 'https://pictures-nigeria.jijistatic.net/137162561_MzAwLTIyNS1iM2FmYzM2YWUw.webp', available: true, features: ['AC', 'Premium Everything', 'Terrain Response', 'Meridian Sound'] },
+  ];
+
+  // Filter showcase vehicles
+  const filteredShowcaseVehicles = showcaseVehicles.filter(v => {
+    if (showcaseFilter.type !== 'all' && v.type !== showcaseFilter.type) return false;
+    if (showcaseFilter.priceRange === 'budget' && v.dailyRate > 40000) return false;
+    if (showcaseFilter.priceRange === 'mid' && (v.dailyRate < 40000 || v.dailyRate > 70000)) return false;
+    if (showcaseFilter.priceRange === 'premium' && v.dailyRate < 70000) return false;
+    return true;
+  });
+
+  // Calculate booking total
+  const calculateBookingTotal = () => {
+    if (!selectedShowcaseVehicle || !clientBooking.pickupDate || !clientBooking.returnDate) return { days: 0, subtotal: 0, vat: 0, total: 0 };
+    const start = new Date(clientBooking.pickupDate);
+    const end = new Date(clientBooking.returnDate);
+    const days = Math.max(1, Math.ceil((end - start) / (1000 * 60 * 60 * 24)));
+    const baseAmount = selectedShowcaseVehicle.dailyRate * days;
+    const driverFee = clientBooking.withDriver ? 5000 * days : 0;
+    const insuranceFee = clientBooking.withInsurance ? 2500 * days : 0;
+    const fuelFee = clientBooking.withFuel ? 15000 : 0;
+    const gpsFee = clientBooking.withGPS ? 1000 * days : 0;
+    const subtotal = baseAmount + driverFee + insuranceFee + fuelFee + gpsFee;
+    const vat = subtotal * 0.075;
+    return { days, baseAmount, driverFee, insuranceFee, fuelFee, gpsFee, subtotal, vat, total: subtotal + vat };
+  };
+
   // Filter bookings by status
   const filteredBookings = filterStatus === 'all'
     ? allBookings
@@ -565,6 +627,7 @@ const CNIFleetManagementUI = () => {
 
   // Navigation items
   const navItems = [
+    { id: 'showcase', label: 'Book a Vehicle', icon: Car, badge: null, highlight: true },
     // { id: 'dashboard', label: 'Dashboard', icon: BarChart3, badge: null },
     { id: 'bookings', label: 'Bookings & Reservations', icon: Calendar, badge: 15 },
     { id: 'fleet', label: 'Fleet Management', icon: Car, badge: null },
@@ -773,6 +836,8 @@ const CNIFleetManagementUI = () => {
             onClick={() => {
               setCurrentView(item.id);
               if (item.id === 'bookings') setBookingsSubView('list');
+              if (item.id === 'fleet') setFleetSubView('list');
+              if (item.id === 'showcase') setShowcaseView('browse');
             }}
             style={{
               width: '100%',
@@ -2659,6 +2724,476 @@ const CNIFleetManagementUI = () => {
     );
   };
 
+  // SHOWCASE/CLIENT BOOKING VIEW
+  const ShowcaseView = () => {
+    const bookingTotals = calculateBookingTotal();
+
+    // Browse View - Vehicle Grid
+    if (showcaseView === 'browse') {
+      return (
+        <div style={{ padding: '0' }}>
+          {/* Hero Section */}
+          <div style={{
+            background: `linear-gradient(135deg, ${colors.primary} 0%, ${colors.secondary} 100%)`,
+            padding: '60px 40px',
+            color: colors.white,
+            textAlign: 'center',
+          }}>
+            <h1 style={{ fontSize: '36px', fontWeight: '700', margin: '0 0 12px 0' }}>
+              Premium Vehicle Rental
+            </h1>
+            <p style={{ fontSize: '18px', opacity: 0.9, margin: 0 }}>
+              Choose from our fleet of well-maintained vehicles for your business or personal needs
+            </p>
+          </div>
+
+          {/* Filters */}
+          <div style={{ padding: '24px 40px', backgroundColor: colors.white, borderBottom: `1px solid ${colors.lightGrey}` }}>
+            <div style={{ display: 'flex', gap: '16px', alignItems: 'center' }}>
+              <span style={{ fontSize: '14px', fontWeight: '600', color: colors.darkGrey }}>Filter by:</span>
+              <select
+                value={showcaseFilter.type}
+                onChange={(e) => setShowcaseFilter({ ...showcaseFilter, type: e.target.value })}
+                style={{ padding: '10px 16px', borderRadius: '8px', border: `1px solid ${colors.lightGrey}`, fontSize: '14px' }}
+              >
+                <option value="all">All Types</option>
+                <option value="Sedan">Sedan</option>
+                <option value="SUV">SUV</option>
+                <option value="Luxury">Luxury</option>
+                <option value="Bus">Bus</option>
+                <option value="Truck">Truck</option>
+              </select>
+              <select
+                value={showcaseFilter.priceRange}
+                onChange={(e) => setShowcaseFilter({ ...showcaseFilter, priceRange: e.target.value })}
+                style={{ padding: '10px 16px', borderRadius: '8px', border: `1px solid ${colors.lightGrey}`, fontSize: '14px' }}
+              >
+                <option value="all">All Prices</option>
+                <option value="budget">Budget (Under ₦40k/day)</option>
+                <option value="mid">Mid-Range (₦40k - ₦70k/day)</option>
+                <option value="premium">Premium (Above ₦70k/day)</option>
+              </select>
+              <span style={{ marginLeft: 'auto', fontSize: '14px', color: colors.mediumGrey }}>
+                {filteredShowcaseVehicles.length} vehicles available
+              </span>
+            </div>
+          </div>
+
+          {/* Vehicle Grid */}
+          <div style={{ padding: '32px 40px' }}>
+            <div style={{ display: 'grid', gridTemplateColumns: 'repeat(4, 1fr)', gap: '24px' }}>
+              {filteredShowcaseVehicles.map(vehicle => (
+                <div
+                  key={vehicle.id}
+                  onClick={() => {
+                    setSelectedShowcaseVehicle(vehicle);
+                    setShowcaseView('vehicle');
+                  }}
+                  style={{
+                    backgroundColor: colors.white,
+                    borderRadius: '16px',
+                    overflow: 'hidden',
+                    border: `1px solid ${colors.lightGrey}`,
+                    cursor: 'pointer',
+                    transition: 'all 0.3s',
+                    opacity: vehicle.available ? 1 : 0.6,
+                  }}
+                  onMouseEnter={(e) => {
+                    if (vehicle.available) {
+                      e.currentTarget.style.transform = 'translateY(-8px)';
+                      e.currentTarget.style.boxShadow = '0 12px 24px rgba(0,0,0,0.15)';
+                    }
+                  }}
+                  onMouseLeave={(e) => {
+                    e.currentTarget.style.transform = 'translateY(0)';
+                    e.currentTarget.style.boxShadow = 'none';
+                  }}
+                >
+                  <div style={{ height: '160px', backgroundColor: '#F0F4F8', overflow: 'hidden' }}>
+                    <img
+                      src={vehicle.image}
+                      alt={vehicle.name}
+                      style={{ width: '100%', height: '100%', objectFit: 'cover' }}
+                      onError={(e) => { e.target.style.display = 'none'; }}
+                    />
+                  </div>
+                  <div style={{ padding: '20px' }}>
+                    <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'start', marginBottom: '8px' }}>
+                      <span style={{ fontSize: '12px', color: colors.primary, fontWeight: '600', backgroundColor: `${colors.primary}15`, padding: '4px 10px', borderRadius: '6px' }}>
+                        {vehicle.type}
+                      </span>
+                      <span style={{ fontSize: '13px', color: '#FFB800', display: 'flex', alignItems: 'center', gap: '4px' }}>
+                        ★ {vehicle.rating}
+                      </span>
+                    </div>
+                    <h3 style={{ fontSize: '17px', fontWeight: '700', color: colors.darkGrey, margin: '0 0 8px 0' }}>
+                      {vehicle.name}
+                    </h3>
+                    <div style={{ fontSize: '13px', color: colors.mediumGrey, marginBottom: '12px' }}>
+                      {vehicle.seats} seats • {vehicle.features.slice(0, 2).join(' • ')}
+                    </div>
+                    <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+                      <div>
+                        <span style={{ fontSize: '20px', fontWeight: '700', color: colors.primary }}>
+                          ₦{vehicle.dailyRate.toLocaleString()}
+                        </span>
+                        <span style={{ fontSize: '13px', color: colors.mediumGrey }}>/day</span>
+                      </div>
+                      {!vehicle.available && (
+                        <span style={{ fontSize: '12px', color: colors.danger, fontWeight: '600' }}>Unavailable</span>
+                      )}
+                    </div>
+                  </div>
+                </div>
+              ))}
+            </div>
+          </div>
+        </div>
+      );
+    }
+
+    // Vehicle Detail View
+    if (showcaseView === 'vehicle' && selectedShowcaseVehicle) {
+      const v = selectedShowcaseVehicle;
+      const recommendations = showcaseVehicles.filter(sv => sv.type === v.type && sv.id !== v.id && sv.available).slice(0, 3);
+
+      return (
+        <div style={{ padding: '32px 40px' }}>
+          <button
+            onClick={() => setShowcaseView('browse')}
+            style={{
+              display: 'flex', alignItems: 'center', gap: '8px', padding: '10px 20px',
+              backgroundColor: colors.white, border: `1px solid ${colors.lightGrey}`,
+              borderRadius: '8px', cursor: 'pointer', fontSize: '14px', fontWeight: '600',
+              color: colors.darkGrey, marginBottom: '24px',
+            }}
+          >
+            <ChevronLeft size={18} /> Back to Vehicles
+          </button>
+
+          <div style={{ display: 'grid', gridTemplateColumns: '1.5fr 1fr', gap: '32px' }}>
+            {/* Left - Vehicle Details */}
+            <div>
+              <div style={{ borderRadius: '16px', overflow: 'hidden', marginBottom: '24px', height: '350px', backgroundColor: '#F0F4F8' }}>
+                <img src={v.image} alt={v.name} style={{ width: '100%', height: '100%', objectFit: 'cover' }} onError={(e) => { e.target.style.display = 'none'; }} />
+              </div>
+              <h1 style={{ fontSize: '28px', fontWeight: '700', color: colors.darkGrey, margin: '0 0 8px 0' }}>{v.name}</h1>
+              <div style={{ display: 'flex', gap: '16px', marginBottom: '20px' }}>
+                <span style={{ fontSize: '13px', color: colors.primary, fontWeight: '600', backgroundColor: `${colors.primary}15`, padding: '6px 14px', borderRadius: '8px' }}>{v.type}</span>
+                <span style={{ fontSize: '14px', color: '#FFB800' }}>★ {v.rating}</span>
+                <span style={{ fontSize: '14px', color: colors.mediumGrey }}>{v.seats} seats</span>
+              </div>
+              <h3 style={{ fontSize: '16px', fontWeight: '600', color: colors.darkGrey, marginBottom: '12px' }}>Features</h3>
+              <div style={{ display: 'flex', flexWrap: 'wrap', gap: '10px', marginBottom: '24px' }}>
+                {v.features.map((f, i) => (
+                  <span key={i} style={{ padding: '8px 16px', backgroundColor: colors.lightGrey, borderRadius: '20px', fontSize: '13px' }}>{f}</span>
+                ))}
+              </div>
+            </div>
+
+            {/* Right - Booking Form */}
+            <div style={{ backgroundColor: colors.white, borderRadius: '16px', padding: '28px', border: `1px solid ${colors.lightGrey}`, height: 'fit-content' }}>
+              <div style={{ fontSize: '28px', fontWeight: '700', color: colors.primary, marginBottom: '4px' }}>
+                ₦{v.dailyRate.toLocaleString()}<span style={{ fontSize: '16px', color: colors.mediumGrey, fontWeight: '400' }}>/day</span>
+              </div>
+              <div style={{ fontSize: '13px', color: colors.mediumGrey, marginBottom: '24px' }}>Inclusive of basic insurance</div>
+
+              <div style={{ marginBottom: '16px' }}>
+                <label style={{ fontSize: '13px', fontWeight: '600', color: colors.darkGrey, display: 'block', marginBottom: '6px' }}>Pickup Date</label>
+                <input type="date" value={clientBooking.pickupDate} onChange={(e) => setClientBooking({ ...clientBooking, pickupDate: e.target.value })}
+                  style={{ width: '100%', padding: '12px', borderRadius: '8px', border: `1px solid ${colors.lightGrey}`, fontSize: '14px' }} />
+              </div>
+              <div style={{ marginBottom: '20px' }}>
+                <label style={{ fontSize: '13px', fontWeight: '600', color: colors.darkGrey, display: 'block', marginBottom: '6px' }}>Return Date</label>
+                <input type="date" value={clientBooking.returnDate} onChange={(e) => setClientBooking({ ...clientBooking, returnDate: e.target.value })}
+                  style={{ width: '100%', padding: '12px', borderRadius: '8px', border: `1px solid ${colors.lightGrey}`, fontSize: '14px' }} />
+              </div>
+
+              <div style={{ marginBottom: '20px' }}>
+                <label style={{ fontSize: '13px', fontWeight: '600', color: colors.darkGrey, display: 'block', marginBottom: '10px' }}>Add-ons</label>
+                {[
+                  { key: 'withDriver', label: 'Professional Driver', price: '₦5,000/day', icon: User },
+                  { key: 'withInsurance', label: 'Full Insurance', price: '₦2,500/day', icon: Shield },
+                  { key: 'withFuel', label: 'Full Fuel Tank', price: '₦15,000', icon: Fuel },
+                  { key: 'withGPS', label: 'GPS Navigation', price: '₦1,000/day', icon: Navigation },
+                ].map(addon => (
+                  <label key={addon.key} style={{ display: 'flex', alignItems: 'center', gap: '10px', padding: '12px', backgroundColor: clientBooking[addon.key] ? `${colors.primary}10` : '#F8F9FA', borderRadius: '8px', marginBottom: '8px', cursor: 'pointer' }}>
+                    <input type="checkbox" checked={clientBooking[addon.key]} onChange={(e) => setClientBooking({ ...clientBooking, [addon.key]: e.target.checked })} />
+                    <addon.icon size={16} color={colors.primary} />
+                    <span style={{ flex: 1, fontSize: '14px' }}>{addon.label}</span>
+                    <span style={{ fontSize: '13px', color: colors.mediumGrey }}>{addon.price}</span>
+                  </label>
+                ))}
+              </div>
+
+              {bookingTotals.days > 0 && (
+                <div style={{ padding: '16px', backgroundColor: '#F8F9FA', borderRadius: '10px', marginBottom: '20px' }}>
+                  <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: '8px', fontSize: '14px' }}>
+                    <span>Base ({bookingTotals.days} days)</span><span>₦{bookingTotals.baseAmount?.toLocaleString()}</span>
+                  </div>
+                  {bookingTotals.driverFee > 0 && <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: '8px', fontSize: '14px' }}><span>Driver</span><span>₦{bookingTotals.driverFee.toLocaleString()}</span></div>}
+                  {bookingTotals.insuranceFee > 0 && <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: '8px', fontSize: '14px' }}><span>Insurance</span><span>₦{bookingTotals.insuranceFee.toLocaleString()}</span></div>}
+                  {bookingTotals.fuelFee > 0 && <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: '8px', fontSize: '14px' }}><span>Fuel</span><span>₦{bookingTotals.fuelFee.toLocaleString()}</span></div>}
+                  {bookingTotals.gpsFee > 0 && <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: '8px', fontSize: '14px' }}><span>GPS</span><span>₦{bookingTotals.gpsFee.toLocaleString()}</span></div>}
+                  <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: '8px', fontSize: '14px', color: colors.mediumGrey }}><span>VAT (7.5%)</span><span>₦{bookingTotals.vat?.toLocaleString()}</span></div>
+                  <div style={{ display: 'flex', justifyContent: 'space-between', fontWeight: '700', fontSize: '16px', paddingTop: '8px', borderTop: `1px solid ${colors.lightGrey}` }}>
+                    <span>Total</span><span style={{ color: colors.primary }}>₦{bookingTotals.total?.toLocaleString()}</span>
+                  </div>
+                </div>
+              )}
+
+              <button
+                onClick={() => setShowcaseView('form')}
+                disabled={!clientBooking.pickupDate || !clientBooking.returnDate}
+                style={{
+                  width: '100%', padding: '16px', backgroundColor: colors.primary, color: colors.white,
+                  border: 'none', borderRadius: '10px', fontSize: '16px', fontWeight: '700', cursor: 'pointer',
+                  opacity: (!clientBooking.pickupDate || !clientBooking.returnDate) ? 0.7 : 1,
+                }}
+              >
+                Continue to Book
+              </button>
+            </div>
+          </div>
+
+          {/* Recommendations */}
+          {recommendations.length > 0 && (
+            <div style={{ marginTop: '48px' }}>
+              <h3 style={{ fontSize: '20px', fontWeight: '700', color: colors.darkGrey, marginBottom: '20px' }}>You might also be interested in</h3>
+              <div style={{ display: 'grid', gridTemplateColumns: 'repeat(3, 1fr)', gap: '24px' }}>
+                {recommendations.map(rv => (
+                  <div key={rv.id} onClick={() => { setSelectedShowcaseVehicle(rv); window.scrollTo(0, 0); }}
+                    style={{ backgroundColor: colors.white, borderRadius: '12px', overflow: 'hidden', border: `1px solid ${colors.lightGrey}`, cursor: 'pointer', transition: 'all 0.2s' }}
+                    onMouseEnter={(e) => e.currentTarget.style.transform = 'translateY(-4px)'}
+                    onMouseLeave={(e) => e.currentTarget.style.transform = 'translateY(0)'}>
+                    <div style={{ height: '120px', backgroundColor: '#F0F4F8' }}>
+                      <img src={rv.image} alt={rv.name} style={{ width: '100%', height: '100%', objectFit: 'cover' }} onError={(e) => { e.target.style.display = 'none'; }} />
+                    </div>
+                    <div style={{ padding: '16px' }}>
+                      <div style={{ fontSize: '15px', fontWeight: '600', color: colors.darkGrey }}>{rv.name}</div>
+                      <div style={{ fontSize: '14px', color: colors.primary, fontWeight: '700', marginTop: '4px' }}>₦{rv.dailyRate.toLocaleString()}/day</div>
+                    </div>
+                  </div>
+                ))}
+              </div>
+            </div>
+          )}
+        </div>
+      );
+    }
+
+    // Customer Details Form
+    if (showcaseView === 'form' && selectedShowcaseVehicle) {
+      return (
+        <div style={{ padding: '32px 40px', maxWidth: '900px', margin: '0 auto' }}>
+          <button onClick={() => setShowcaseView('vehicle')} style={{ display: 'flex', alignItems: 'center', gap: '8px', padding: '10px 20px', backgroundColor: colors.white, border: `1px solid ${colors.lightGrey}`, borderRadius: '8px', cursor: 'pointer', fontSize: '14px', fontWeight: '600', color: colors.darkGrey, marginBottom: '24px' }}>
+            <ChevronLeft size={18} /> Back
+          </button>
+
+          <div style={{ display: 'grid', gridTemplateColumns: '1.5fr 1fr', gap: '32px' }}>
+            <div style={{ backgroundColor: colors.white, borderRadius: '16px', padding: '32px', border: `1px solid ${colors.lightGrey}` }}>
+              <h2 style={{ fontSize: '22px', fontWeight: '700', color: colors.darkGrey, margin: '0 0 24px 0' }}>Customer Details</h2>
+
+              <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '16px', marginBottom: '16px' }}>
+                <div>
+                  <label style={{ fontSize: '13px', fontWeight: '600', color: colors.darkGrey, display: 'block', marginBottom: '6px' }}>Full Name *</label>
+                  <input type="text" value={clientBooking.customerName} onChange={(e) => setClientBooking({ ...clientBooking, customerName: e.target.value })}
+                    placeholder="John Doe" style={{ width: '100%', padding: '12px', borderRadius: '8px', border: `1px solid ${colors.lightGrey}`, fontSize: '14px' }} />
+                </div>
+                <div>
+                  <label style={{ fontSize: '13px', fontWeight: '600', color: colors.darkGrey, display: 'block', marginBottom: '6px' }}>Company</label>
+                  <input type="text" value={clientBooking.customerCompany} onChange={(e) => setClientBooking({ ...clientBooking, customerCompany: e.target.value })}
+                    placeholder="Acme Corporation" style={{ width: '100%', padding: '12px', borderRadius: '8px', border: `1px solid ${colors.lightGrey}`, fontSize: '14px' }} />
+                </div>
+              </div>
+
+              <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '16px', marginBottom: '16px' }}>
+                <div>
+                  <label style={{ fontSize: '13px', fontWeight: '600', color: colors.darkGrey, display: 'block', marginBottom: '6px' }}>Email *</label>
+                  <input type="email" value={clientBooking.customerEmail} onChange={(e) => setClientBooking({ ...clientBooking, customerEmail: e.target.value })}
+                    placeholder="john@email.com" style={{ width: '100%', padding: '12px', borderRadius: '8px', border: `1px solid ${colors.lightGrey}`, fontSize: '14px' }} />
+                </div>
+                <div>
+                  <label style={{ fontSize: '13px', fontWeight: '600', color: colors.darkGrey, display: 'block', marginBottom: '6px' }}>Phone *</label>
+                  <input type="tel" value={clientBooking.customerPhone} onChange={(e) => setClientBooking({ ...clientBooking, customerPhone: e.target.value })}
+                    placeholder="0801-234-5678" style={{ width: '100%', padding: '12px', borderRadius: '8px', border: `1px solid ${colors.lightGrey}`, fontSize: '14px' }} />
+                </div>
+              </div>
+
+              <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '16px', marginBottom: '16px' }}>
+                <div>
+                  <label style={{ fontSize: '13px', fontWeight: '600', color: colors.darkGrey, display: 'block', marginBottom: '6px' }}>Pickup Location *</label>
+                  <input type="text" value={clientBooking.pickupLocation} onChange={(e) => setClientBooking({ ...clientBooking, pickupLocation: e.target.value })}
+                    placeholder="Victoria Island, Lagos" style={{ width: '100%', padding: '12px', borderRadius: '8px', border: `1px solid ${colors.lightGrey}`, fontSize: '14px' }} />
+                </div>
+                <div>
+                  <label style={{ fontSize: '13px', fontWeight: '600', color: colors.darkGrey, display: 'block', marginBottom: '6px' }}>Return Location</label>
+                  <input type="text" value={clientBooking.returnLocation} onChange={(e) => setClientBooking({ ...clientBooking, returnLocation: e.target.value })}
+                    placeholder="Same as pickup" style={{ width: '100%', padding: '12px', borderRadius: '8px', border: `1px solid ${colors.lightGrey}`, fontSize: '14px' }} />
+                </div>
+              </div>
+
+              <div>
+                <label style={{ fontSize: '13px', fontWeight: '600', color: colors.darkGrey, display: 'block', marginBottom: '6px' }}>Special Requests</label>
+                <textarea value={clientBooking.notes} onChange={(e) => setClientBooking({ ...clientBooking, notes: e.target.value })}
+                  placeholder="Any special requirements..." rows={3} style={{ width: '100%', padding: '12px', borderRadius: '8px', border: `1px solid ${colors.lightGrey}`, fontSize: '14px', resize: 'vertical' }} />
+              </div>
+            </div>
+
+            {/* Booking Summary */}
+            <div style={{ backgroundColor: colors.white, borderRadius: '16px', padding: '28px', border: `1px solid ${colors.lightGrey}`, height: 'fit-content' }}>
+              <h3 style={{ fontSize: '18px', fontWeight: '700', color: colors.darkGrey, margin: '0 0 20px 0' }}>Booking Summary</h3>
+
+              {/* Vehicle Info */}
+              <div style={{ display: 'flex', gap: '12px', marginBottom: '20px', paddingBottom: '16px', borderBottom: `1px solid ${colors.lightGrey}` }}>
+                <div style={{ width: '80px', height: '60px', borderRadius: '8px', overflow: 'hidden', backgroundColor: '#F0F4F8' }}>
+                  <img src={selectedShowcaseVehicle.image} alt="" style={{ width: '100%', height: '100%', objectFit: 'cover' }} />
+                </div>
+                <div>
+                  <div style={{ fontSize: '15px', fontWeight: '600', color: colors.darkGrey }}>{selectedShowcaseVehicle.name}</div>
+                  <div style={{ fontSize: '13px', color: colors.mediumGrey }}>{bookingTotals.days} day{bookingTotals.days > 1 ? 's' : ''}</div>
+                  <div style={{ fontSize: '12px', color: colors.mediumGrey }}>{clientBooking.pickupDate} → {clientBooking.returnDate}</div>
+                </div>
+              </div>
+
+              {/* Price Breakdown */}
+              <div style={{ padding: '16px', backgroundColor: '#F8F9FA', borderRadius: '10px', marginBottom: '20px' }}>
+                <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: '10px', fontSize: '14px' }}>
+                  <span style={{ color: colors.darkGrey }}>Base ({bookingTotals.days} day{bookingTotals.days > 1 ? 's' : ''})</span>
+                  <span style={{ fontWeight: '500' }}>₦{bookingTotals.baseAmount?.toLocaleString()}</span>
+                </div>
+                {bookingTotals.driverFee > 0 && (
+                  <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: '10px', fontSize: '14px' }}>
+                    <span style={{ color: colors.darkGrey }}>Driver</span>
+                    <span style={{ fontWeight: '500' }}>₦{bookingTotals.driverFee.toLocaleString()}</span>
+                  </div>
+                )}
+                {bookingTotals.insuranceFee > 0 && (
+                  <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: '10px', fontSize: '14px' }}>
+                    <span style={{ color: colors.darkGrey }}>Insurance</span>
+                    <span style={{ fontWeight: '500' }}>₦{bookingTotals.insuranceFee.toLocaleString()}</span>
+                  </div>
+                )}
+                {bookingTotals.fuelFee > 0 && (
+                  <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: '10px', fontSize: '14px' }}>
+                    <span style={{ color: colors.darkGrey }}>Full Fuel Tank</span>
+                    <span style={{ fontWeight: '500' }}>₦{bookingTotals.fuelFee.toLocaleString()}</span>
+                  </div>
+                )}
+                {bookingTotals.gpsFee > 0 && (
+                  <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: '10px', fontSize: '14px' }}>
+                    <span style={{ color: colors.darkGrey }}>GPS Navigation</span>
+                    <span style={{ fontWeight: '500' }}>₦{bookingTotals.gpsFee.toLocaleString()}</span>
+                  </div>
+                )}
+                <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: '10px', fontSize: '14px', color: colors.mediumGrey }}>
+                  <span>VAT (7.5%)</span>
+                  <span>₦{bookingTotals.vat?.toLocaleString()}</span>
+                </div>
+                <div style={{ display: 'flex', justifyContent: 'space-between', fontWeight: '700', fontSize: '18px', paddingTop: '12px', marginTop: '8px', borderTop: `1px solid ${colors.lightGrey}` }}>
+                  <span>Total</span>
+                  <span style={{ color: colors.primary }}>₦{bookingTotals.total?.toLocaleString()}</span>
+                </div>
+              </div>
+
+              <button
+                onClick={() => { setBookingReference(`CNI-${Date.now().toString().slice(-8)}`); setShowcaseView('confirmation'); }}
+                disabled={!clientBooking.customerName || !clientBooking.customerEmail || !clientBooking.customerPhone || !clientBooking.pickupLocation}
+                style={{ width: '100%', padding: '16px', backgroundColor: colors.primary, color: colors.white, border: 'none', borderRadius: '10px', fontSize: '16px', fontWeight: '700', cursor: 'pointer', opacity: (!clientBooking.customerName || !clientBooking.customerEmail || !clientBooking.customerPhone || !clientBooking.pickupLocation) ? 0.7 : 1 }}>
+                Confirm Booking
+              </button>
+            </div>
+          </div>
+        </div>
+      );
+    }
+
+    // Confirmation View
+    if (showcaseView === 'confirmation' && selectedShowcaseVehicle) {
+      return (
+        <div style={{ padding: '60px 40px', textAlign: 'center' }}>
+          <div style={{ backgroundColor: colors.white, borderRadius: '20px', padding: '48px', maxWidth: '700px', margin: '0 auto', border: `1px solid ${colors.lightGrey}` }}>
+            <div style={{ width: '80px', height: '80px', backgroundColor: '#D4EDDA', borderRadius: '50%', display: 'flex', alignItems: 'center', justifyContent: 'center', margin: '0 auto 24px' }}>
+              <CheckCircle size={40} color="#155724" />
+            </div>
+            <h1 style={{ fontSize: '28px', fontWeight: '700', color: colors.darkGrey, margin: '0 0 12px 0' }}>Booking Confirmed!</h1>
+            <p style={{ fontSize: '16px', color: colors.mediumGrey, marginBottom: '24px' }}>Your booking reference is</p>
+            <div style={{ fontSize: '32px', fontWeight: '700', color: colors.primary, backgroundColor: `${colors.primary}15`, padding: '16px 32px', borderRadius: '12px', display: 'inline-block', marginBottom: '32px' }}>
+              {bookingReference}
+            </div>
+
+            {/* Booking Details */}
+            <div style={{ textAlign: 'left', padding: '24px', backgroundColor: '#F8F9FA', borderRadius: '12px', marginBottom: '24px' }}>
+              <h3 style={{ fontSize: '16px', fontWeight: '600', marginBottom: '16px', color: colors.darkGrey }}>Booking Details</h3>
+              <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '16px', fontSize: '14px', marginBottom: '20px' }}>
+                <div><span style={{ color: colors.mediumGrey }}>Vehicle:</span> <strong>{selectedShowcaseVehicle.name}</strong></div>
+                <div><span style={{ color: colors.mediumGrey }}>Duration:</span> <strong>{bookingTotals.days} day{bookingTotals.days > 1 ? 's' : ''}</strong></div>
+                <div><span style={{ color: colors.mediumGrey }}>Pickup:</span> <strong>{clientBooking.pickupDate}</strong></div>
+                <div><span style={{ color: colors.mediumGrey }}>Return:</span> <strong>{clientBooking.returnDate}</strong></div>
+                <div><span style={{ color: colors.mediumGrey }}>Customer:</span> <strong>{clientBooking.customerName}</strong></div>
+                <div><span style={{ color: colors.mediumGrey }}>Location:</span> <strong>{clientBooking.pickupLocation}</strong></div>
+              </div>
+
+              {/* Price Breakdown */}
+              <div style={{ borderTop: `1px solid ${colors.lightGrey}`, paddingTop: '16px' }}>
+                <h4 style={{ fontSize: '14px', fontWeight: '600', marginBottom: '12px', color: colors.darkGrey }}>Price Breakdown</h4>
+                <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: '8px', fontSize: '14px' }}>
+                  <span>Base ({bookingTotals.days} day{bookingTotals.days > 1 ? 's' : ''})</span>
+                  <span>₦{bookingTotals.baseAmount?.toLocaleString()}</span>
+                </div>
+                {bookingTotals.driverFee > 0 && (
+                  <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: '8px', fontSize: '14px' }}>
+                    <span>Driver</span><span>₦{bookingTotals.driverFee.toLocaleString()}</span>
+                  </div>
+                )}
+                {bookingTotals.insuranceFee > 0 && (
+                  <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: '8px', fontSize: '14px' }}>
+                    <span>Insurance</span><span>₦{bookingTotals.insuranceFee.toLocaleString()}</span>
+                  </div>
+                )}
+                {bookingTotals.fuelFee > 0 && (
+                  <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: '8px', fontSize: '14px' }}>
+                    <span>Full Fuel Tank</span><span>₦{bookingTotals.fuelFee.toLocaleString()}</span>
+                  </div>
+                )}
+                {bookingTotals.gpsFee > 0 && (
+                  <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: '8px', fontSize: '14px' }}>
+                    <span>GPS Navigation</span><span>₦{bookingTotals.gpsFee.toLocaleString()}</span>
+                  </div>
+                )}
+                <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: '8px', fontSize: '14px', color: colors.mediumGrey }}>
+                  <span>VAT (7.5%)</span><span>₦{bookingTotals.vat?.toLocaleString()}</span>
+                </div>
+                <div style={{ display: 'flex', justifyContent: 'space-between', fontWeight: '700', fontSize: '18px', paddingTop: '12px', marginTop: '8px', borderTop: `1px solid ${colors.lightGrey}` }}>
+                  <span>Total</span><span style={{ color: colors.primary }}>₦{bookingTotals.total?.toLocaleString()}</span>
+                </div>
+              </div>
+            </div>
+
+            <div style={{ textAlign: 'left', padding: '20px', backgroundColor: '#FFF3CD', borderRadius: '12px', marginBottom: '24px' }}>
+              <h4 style={{ fontSize: '14px', fontWeight: '600', color: '#856404', margin: '0 0 8px 0' }}>Payment Instructions</h4>
+              <p style={{ fontSize: '13px', color: '#856404', margin: 0 }}>
+                Please transfer ₦{bookingTotals.total?.toLocaleString()} to:<br />
+                <strong>C&I Leasing PLC</strong><br />
+                Wema Bank - 0123456789<br />
+                Use reference: {bookingReference}
+              </p>
+            </div>
+
+            <div style={{ display: 'flex', gap: '12px', justifyContent: 'center' }}>
+              <button onClick={() => { setShowcaseView('browse'); setSelectedShowcaseVehicle(null); setClientBooking({ pickupDate: '', returnDate: '', withDriver: true, withInsurance: true, withFuel: true, withGPS: false, customerName: '', customerEmail: '', customerPhone: '', customerCompany: '', pickupLocation: '', returnLocation: '', pickupTime: '09:00', returnTime: '09:00', notes: '' }); }}
+                style={{ padding: '14px 28px', backgroundColor: colors.primary, color: colors.white, border: 'none', borderRadius: '10px', fontSize: '15px', fontWeight: '600', cursor: 'pointer' }}>
+                Book Another Vehicle
+              </button>
+            </div>
+          </div>
+        </div>
+      );
+    }
+
+    return null;
+  };
+
   // FLEET LIVE MAP VIEW
   const FleetLiveMapView = () => (
     <div style={{ padding: '32px' }}>
@@ -2840,7 +3375,8 @@ const CNIFleetManagementUI = () => {
               {fleetSubView === 'map' && <FleetLiveMapView />}
             </>
           )}
-          {currentView !== 'bookings' && currentView !== 'fleet' && (
+          {currentView === 'showcase' && <ShowcaseView />}
+          {currentView !== 'bookings' && currentView !== 'fleet' && currentView !== 'showcase' && (
             <div style={{ padding: '80px 32px', textAlign: 'center' }}>
               <div style={{
                 display: 'inline-block',
