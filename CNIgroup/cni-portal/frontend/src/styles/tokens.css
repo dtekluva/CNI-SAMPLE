@@ -1,0 +1,331 @@
+/* ============================================================
+   Northstar Design Tokens v1.0 — CNI Group Governance Portal
+   Prefix: --ns-   |   Prepared 2026-07-17
+   Primitives are theme-independent; semantic aliases flip per theme.
+   Components must reference semantic aliases (--ns-color-*), never primitives.
+   ============================================================ */
+
+:root {
+  /* -------- Primitive: color ramps (never referenced by components) -------- */
+  --ns-neutral-0: #FFFFFF;
+  --ns-neutral-50: #F8FAFC;
+  --ns-neutral-100: #F1F5F9;
+  --ns-neutral-200: #E2E8F0;
+  --ns-neutral-300: #CBD5E1;
+  --ns-neutral-400: #94A3B8;
+  --ns-neutral-500: #64748B;
+  --ns-neutral-600: #475569;
+  --ns-neutral-700: #334155;
+  --ns-neutral-800: #1E293B;
+  --ns-neutral-900: #0F172A;
+  --ns-neutral-950: #020617;
+
+  --ns-blue-50: #EFF6FF;  --ns-blue-100: #DBEAFE; --ns-blue-200: #BFDBFE;
+  --ns-blue-300: #93C5FD; --ns-blue-400: #60A5FA; --ns-blue-500: #3B82F6;
+  --ns-blue-600: #2563EB; --ns-blue-700: #1D4ED8; --ns-blue-800: #1E40AF; --ns-blue-900: #1E3A8A;
+
+  --ns-green-50: #ECFDF5; --ns-green-100: #D1FAE5; --ns-green-500: #10B981;
+  --ns-green-600: #059669; --ns-green-700: #047857; --ns-green-800: #065F46;
+
+  --ns-amber-50: #FFFBEB; --ns-amber-100: #FEF3C7; --ns-amber-400: #FBBF24;
+  --ns-amber-500: #F59E0B; --ns-amber-600: #D97706; --ns-amber-700: #B45309; --ns-amber-800: #92400E;
+
+  --ns-red-50: #FEF2F2; --ns-red-100: #FEE2E2; --ns-red-400: #F87171;
+  --ns-red-500: #EF4444; --ns-red-600: #DC2626; --ns-red-700: #B91C1C; --ns-red-800: #991B1B;
+
+  --ns-purple-50: #F5F3FF; --ns-purple-100: #EDE9FE; --ns-purple-200: #DDD6FE;
+  --ns-purple-400: #A78BFA; --ns-purple-500: #8B5CF6; --ns-purple-600: #7C3AED;
+  --ns-purple-700: #6D28D9; --ns-purple-900: #4C1D95;
+
+  /* -------- Primitive: spacing (8-pt) -------- */
+  --ns-space-0: 0px;
+  --ns-space-3xs: 4px;
+  --ns-space-2xs: 8px;
+  --ns-space-xs: 12px;
+  --ns-space-sm: 16px;
+  --ns-space-md: 24px;
+  --ns-space-lg: 32px;
+  --ns-space-xl: 48px;
+  --ns-space-2xl: 64px;
+  --ns-space-3xl: 96px;
+
+  /* -------- Primitive: radius -------- */
+  --ns-radius-none: 0px;
+  --ns-radius-small: 4px;
+  --ns-radius-medium: 8px;
+  --ns-radius-large: 12px;
+  --ns-radius-full: 999px;
+
+  /* -------- Primitive: typography -------- */
+  --ns-font-primary: "Inter", system-ui, -apple-system, "Segoe UI", Roboto, sans-serif;
+  --ns-font-reading: "Source Serif 4", Georgia, "Times New Roman", serif;
+  --ns-font-mono: "JetBrains Mono", ui-monospace, "SF Mono", Menlo, monospace;
+
+  --ns-weight-regular: 400;
+  --ns-weight-medium: 500;
+  --ns-weight-semibold: 600;
+  --ns-weight-bold: 700;
+
+  --ns-scale: 1; /* Presentation Mode overrides to 1.125 */
+  --ns-size-display: calc(2.25rem * var(--ns-scale));
+  --ns-size-page: calc(1.75rem * var(--ns-scale));
+  --ns-size-heading: calc(1.375rem * var(--ns-scale));
+  --ns-size-subheading: calc(1.125rem * var(--ns-scale));
+  --ns-size-body-lg: calc(1.0625rem * var(--ns-scale));
+  --ns-size-body: calc(1rem * var(--ns-scale));
+  --ns-size-body-sm: calc(0.875rem * var(--ns-scale));
+  --ns-size-caption: calc(0.8125rem * var(--ns-scale));
+  --ns-size-label: calc(0.75rem * var(--ns-scale));
+
+  --ns-lh-display: 2.75rem; --ns-lh-page: 2.25rem; --ns-lh-heading: 1.875rem;
+  --ns-lh-subheading: 1.625rem; --ns-lh-body-lg: 1.75rem; --ns-lh-body: 1.625rem;
+  --ns-lh-body-sm: 1.375rem; --ns-lh-caption: 1.125rem; --ns-lh-label: 1rem;
+
+  --ns-tracking-tight: -0.01em;
+  --ns-tracking-normal: 0;
+  --ns-tracking-label: 0.04em;
+
+  /* -------- Primitive: motion -------- */
+  --ns-duration-fast: 120ms;
+  --ns-duration-normal: 200ms;
+  --ns-duration-slow: 320ms;
+  --ns-easing-standard: cubic-bezier(0.2, 0, 0.2, 1);
+  --ns-easing-entrance: cubic-bezier(0, 0, 0.2, 1);
+  --ns-easing-exit: cubic-bezier(0.4, 0, 1, 1);
+
+  /* -------- Primitive: elevation (borders over shadows) -------- */
+  --ns-elevation-0: none;
+  --ns-elevation-1: 0 1px 2px rgba(15,23,42,0.04);
+  --ns-elevation-2: 0 4px 12px rgba(15,23,42,0.08);
+  --ns-elevation-3: 0 12px 32px rgba(15,23,42,0.12);
+  --ns-elevation-4: 0 20px 48px rgba(15,23,42,0.16);
+
+  /* -------- Primitive: borders / focus / layering / misc -------- */
+  --ns-border-hairline: 1px;
+  --ns-border-strong: 2px;
+  --ns-focus-ring-width: 2px;
+  --ns-focus-ring-offset: 2px;
+
+  --ns-z-base: 0;
+  --ns-z-sticky: 100;
+  --ns-z-dropdown: 1000;
+  --ns-z-overlay: 1100;
+  --ns-z-modal: 1200;
+  --ns-z-toast: 1300;
+  --ns-z-critical: 1400;
+
+  --ns-opacity-disabled: 0.4;
+  --ns-opacity-scrim: 0.45;
+  --ns-touch-min: 44px;
+
+  /* ============================================================
+     Semantic aliases — LIGHT (default). Components use these.
+     ============================================================ */
+  --ns-color-canvas: var(--ns-neutral-50);
+  --ns-color-bg-secondary: var(--ns-neutral-100);
+  --ns-color-surface: var(--ns-neutral-0);
+  --ns-color-surface-subtle: var(--ns-neutral-50);
+  --ns-color-surface-hover: var(--ns-neutral-100);
+  --ns-color-surface-selected: var(--ns-blue-50);
+  --ns-color-overlay-scrim: rgba(15,23,42,0.45);
+
+  --ns-color-text-primary: var(--ns-neutral-900);
+  --ns-color-text-secondary: var(--ns-neutral-600);
+  --ns-color-text-tertiary: var(--ns-neutral-500);
+  --ns-color-text-disabled: var(--ns-neutral-400);
+  --ns-color-text-inverse: var(--ns-neutral-0);
+  --ns-color-text-link: var(--ns-blue-700);
+
+  --ns-color-border-subtle: var(--ns-neutral-100);
+  --ns-color-border-default: var(--ns-neutral-200);
+  --ns-color-border-strong: var(--ns-neutral-300);
+  --ns-color-border-focus: var(--ns-blue-600);
+
+  --ns-color-primary: var(--ns-blue-600);
+  --ns-color-primary-hover: var(--ns-blue-700);
+  --ns-color-primary-pressed: var(--ns-blue-800);
+  --ns-color-primary-subtle: var(--ns-blue-50);
+  --ns-color-on-primary: var(--ns-neutral-0);
+
+  --ns-color-success-fill: var(--ns-green-600);
+  --ns-color-success-subtle: var(--ns-green-50);
+  --ns-color-success-text: var(--ns-green-700);
+  --ns-color-success-on: var(--ns-neutral-0);
+
+  --ns-color-warning-fill: var(--ns-amber-600);
+  --ns-color-warning-subtle: var(--ns-amber-50);
+  --ns-color-warning-text: var(--ns-amber-700);
+  --ns-color-warning-on: var(--ns-neutral-900);
+
+  --ns-color-danger-fill: var(--ns-red-600);
+  --ns-color-danger-subtle: var(--ns-red-50);
+  --ns-color-danger-text: var(--ns-red-700);
+  --ns-color-danger-on: var(--ns-neutral-0);
+
+  --ns-color-info-fill: var(--ns-blue-600);
+  --ns-color-info-subtle: var(--ns-blue-50);
+  --ns-color-info-text: var(--ns-blue-700);
+  --ns-color-info-on: var(--ns-neutral-0);
+
+  --ns-color-ai-fill: var(--ns-purple-600);
+  --ns-color-ai-subtle: var(--ns-purple-50);
+  --ns-color-ai-text: var(--ns-purple-700);
+  --ns-color-ai-border: var(--ns-purple-200);
+  --ns-color-on-ai: var(--ns-neutral-0);
+
+  /* Composite: focus ring (offset ring drawn with box-shadow) */
+  --ns-focus-ring: 0 0 0 var(--ns-focus-ring-offset) var(--ns-color-surface),
+                   0 0 0 calc(var(--ns-focus-ring-offset) + var(--ns-focus-ring-width)) var(--ns-color-border-focus);
+}
+
+/* ============================================================
+   DARK
+   ============================================================ */
+:root[data-theme="dark"] {
+  --ns-color-canvas: #0A0F1A;
+  --ns-color-bg-secondary: #0F1626;
+  --ns-color-surface: #131C2E;
+  --ns-color-surface-subtle: #0F1626;
+  --ns-color-surface-hover: #1B2740;
+  --ns-color-surface-selected: #16233F;
+  --ns-color-overlay-scrim: rgba(2,6,23,0.65);
+
+  --ns-color-text-primary: #F1F5F9;
+  --ns-color-text-secondary: #94A3B8;
+  --ns-color-text-tertiary: #64748B;
+  --ns-color-text-disabled: #475569;
+  --ns-color-text-inverse: #0F172A;
+  --ns-color-text-link: #93C5FD;
+
+  --ns-color-border-subtle: #1B2740;
+  --ns-color-border-default: #24304A;
+  --ns-color-border-strong: #33415C;
+  --ns-color-border-focus: #60A5FA;
+
+  --ns-color-primary: #3B82F6;
+  --ns-color-primary-hover: #60A5FA;
+  --ns-color-primary-pressed: #93C5FD;
+  --ns-color-primary-subtle: #16233F;
+  --ns-color-on-primary: #0A0F1A;
+
+  --ns-color-success-fill: #10B981;
+  --ns-color-success-subtle: #0C2A22;
+  --ns-color-success-text: #34D399;
+  --ns-color-success-on: #0A0F1A;
+
+  --ns-color-warning-fill: #F59E0B;
+  --ns-color-warning-subtle: #2A2008;
+  --ns-color-warning-text: #FBBF24;
+  --ns-color-warning-on: #0A0F1A;
+
+  --ns-color-danger-fill: #EF4444;
+  --ns-color-danger-subtle: #2C1315;
+  --ns-color-danger-text: #F87171;
+  --ns-color-danger-on: #0A0F1A;
+
+  --ns-color-info-fill: #3B82F6;
+  --ns-color-info-subtle: #16233F;
+  --ns-color-info-text: #60A5FA;
+  --ns-color-info-on: #0A0F1A;
+
+  --ns-color-ai-fill: #8B5CF6;
+  --ns-color-ai-subtle: #1E1B34;
+  --ns-color-ai-text: #A78BFA;
+  --ns-color-ai-border: #4C1D95;
+  --ns-color-on-ai: #0A0F1A;
+
+  /* Elevation reads darker on dark surfaces */
+  --ns-elevation-1: 0 1px 2px rgba(0,0,0,0.4);
+  --ns-elevation-2: 0 4px 12px rgba(0,0,0,0.5);
+  --ns-elevation-3: 0 12px 32px rgba(0,0,0,0.6);
+  --ns-elevation-4: 0 20px 48px rgba(0,0,0,0.7);
+}
+
+/* ============================================================
+   HIGH CONTRAST (light base) — pure ink text, 2px ink borders, no shadows
+   ============================================================ */
+:root[data-theme="hc"] {
+  --ns-color-canvas: #FFFFFF;
+  --ns-color-bg-secondary: #FFFFFF;
+  --ns-color-surface: #FFFFFF;
+  --ns-color-surface-subtle: #FFFFFF;
+  --ns-color-surface-hover: #F1F5F9;
+  --ns-color-surface-selected: #DBEAFE;
+  --ns-color-overlay-scrim: rgba(0,0,0,0.6);
+
+  --ns-color-text-primary: #000000;
+  --ns-color-text-secondary: #1E293B;
+  --ns-color-text-tertiary: #334155;
+  --ns-color-text-disabled: #64748B;
+  --ns-color-text-inverse: #FFFFFF;
+  --ns-color-text-link: #1D4ED8;
+
+  --ns-color-border-subtle: #334155;
+  --ns-color-border-default: #000000;
+  --ns-color-border-strong: #000000;
+  --ns-color-border-focus: #1D4ED8;
+
+  --ns-color-primary: #1D4ED8;
+  --ns-color-primary-hover: #1E40AF;
+  --ns-color-primary-pressed: #1E3A8A;
+  --ns-color-primary-subtle: #DBEAFE;
+  --ns-color-on-primary: #FFFFFF;
+
+  --ns-color-success-fill: #047857;
+  --ns-color-success-subtle: #D1FAE5;
+  --ns-color-success-text: #065F46;
+  --ns-color-success-on: #FFFFFF;
+
+  --ns-color-warning-fill: #B45309;
+  --ns-color-warning-subtle: #FEF3C7;
+  --ns-color-warning-text: #92400E;
+  --ns-color-warning-on: #FFFFFF;
+
+  --ns-color-danger-fill: #B91C1C;
+  --ns-color-danger-subtle: #FEE2E2;
+  --ns-color-danger-text: #991B1B;
+  --ns-color-danger-on: #FFFFFF;
+
+  --ns-color-info-fill: #1D4ED8;
+  --ns-color-info-subtle: #DBEAFE;
+  --ns-color-info-text: #1E40AF;
+  --ns-color-info-on: #FFFFFF;
+
+  --ns-color-ai-fill: #6D28D9;
+  --ns-color-ai-subtle: #EDE9FE;
+  --ns-color-ai-text: #4C1D95;
+  --ns-color-ai-border: #6D28D9;
+  --ns-color-on-ai: #FFFFFF;
+
+  --ns-elevation-1: none;
+  --ns-elevation-2: none;
+  --ns-elevation-3: none;
+  --ns-elevation-4: none;
+  --ns-focus-ring-width: 3px;
+}
+
+/* ============================================================
+   PRESENTATION MODE — light aliases + larger type scale, looser density
+   ============================================================ */
+:root[data-theme="presentation"] {
+  --ns-scale: 1.125;
+}
+
+/* ============================================================
+   Reduced motion
+   ============================================================ */
+@media (prefers-reduced-motion: reduce) {
+  :root {
+    --ns-duration-fast: 1ms;
+    --ns-duration-normal: 1ms;
+    --ns-duration-slow: 1ms;
+  }
+}
+
+/* Optional: follow OS dark preference when no explicit theme is set */
+@media (prefers-color-scheme: dark) {
+  :root:not([data-theme]) {
+    color-scheme: dark;
+    /* Mirror the dark block above; kept minimal here — set data-theme="dark" for full control. */
+  }
+}

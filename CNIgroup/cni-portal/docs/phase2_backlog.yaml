@@ -1,0 +1,70 @@
+# Phase 2 backlog. Human source: PHASE2_BACKLOG.md.
+# Loop: lowest-id with deps done -> build -> tests green -> done (checkpoint -> needs-review).
+# Layer: backend = models+services+DRF+pytest; frontend = screen(s)+Vitest; full = both.
+# depends on Phase-1 apps (accounts/entities/rbac/meetings/documents/minutes/resolutions/actions/notifications/audit) is implicit.
+meta:
+  prepared: "2026-07-17"
+  branch: "build/phase-2 (off build/phase-1; merges after phase-1 is reviewed to main)"
+  rule: "API-first; frontend consumes it. Regulated/access-control tasks are checkpoints -> needs-review. Never commit secrets."
+
+tasks:
+  # --- Epic G: statutory registers & directors' interests (CAMA core) ---
+  - {id: P2-01, epic: G, layer: backend,  title: Statutory registers per entity,        fr: FR-ENT-3,  depends: [],              checkpoint: true,  status: needs-review}
+  - {id: P2-02, epic: G, layer: frontend, title: Registers screen,                       fr: FR-ENT-3,  depends: [P2-01],         checkpoint: false, status: done}
+  - {id: P2-03, epic: G, layer: backend,  title: Register of directors' interests,       fr: FR-CONF-1, depends: [],              checkpoint: true,  status: needs-review}
+  - {id: P2-04, epic: G, layer: backend,  title: Per-meeting conflict declaration,       fr: FR-CONF-2, depends: [P2-03],         checkpoint: false, status: done}
+  - {id: P2-05, epic: G, layer: frontend, title: Interests & conflicts screens,          fr: FR-CONF-1, depends: [P2-03, P2-04],  checkpoint: false, status: done}
+
+  # --- Epic H: recusal & voting ---
+  - {id: P2-06, epic: H, layer: backend,  title: Item-level recusal overrides,           fr: FR-RBAC-2, depends: [P2-04],         checkpoint: true,  status: needs-review}
+  - {id: P2-07, epic: H, layer: backend,  title: Multiple voting modes,                  fr: FR-VOTE-1, depends: [],              checkpoint: false, status: done}
+  - {id: P2-08, epic: H, layer: backend,  title: Recusal enforcement in voting,          fr: FR-VOTE-2, depends: [P2-06, P2-07], checkpoint: true,  status: needs-review}
+  - {id: P2-09, epic: H, layer: frontend, title: Voting & recusal UI,                     fr: FR-VOTE-1, depends: [P2-07, P2-08],  checkpoint: false, status: done}
+
+  # --- Epic I: minute book & record integrity (CAMA) ---
+  - {id: P2-10, epic: I, layer: backend,  title: Immutable signed minutes & minute book, fr: FR-MIN-3,  depends: [],              checkpoint: true,  status: needs-review}
+  - {id: P2-11, epic: I, layer: backend,  title: Matters arising auto-carry,             fr: FR-MIN-4,  depends: [P2-10],         checkpoint: false, status: done}
+  - {id: P2-12, epic: I, layer: backend,  title: Record integrity verification,          fr: NFR-INT-1, depends: [P2-10],         checkpoint: true,  status: needs-review}
+  - {id: P2-13, epic: I, layer: frontend, title: Minute book screen,                      fr: FR-MIN-3,  depends: [P2-10, P2-11],  checkpoint: false, status: done}
+
+  # --- Epic J: committees ---
+  - {id: P2-14, epic: J, layer: backend,  title: Committee setup & charters,             fr: FR-COM-1,  depends: [],              checkpoint: false, status: done}
+  - {id: P2-15, epic: J, layer: backend,  title: Membership terms & rotation,            fr: FR-COM-2,  depends: [P2-14],         checkpoint: false, status: done}
+  - {id: P2-16, epic: J, layer: backend,  title: Committee-to-board reporting,           fr: FR-COM-3,  depends: [P2-14],         checkpoint: false, status: done}
+  - {id: P2-17, epic: J, layer: frontend, title: Committees screen,                       fr: FR-COM-1,  depends: [P2-14, P2-15, P2-16], checkpoint: false, status: done}
+
+  # --- Epic K: compliance & statutory calendar ---
+  - {id: P2-18, epic: K, layer: backend,  title: Compliance calendar per entity,         fr: FR-CMP-1,  depends: [],              checkpoint: false, status: done}
+  - {id: P2-19, epic: K, layer: backend,  title: Filing tracker & evidence,              fr: FR-CMP-2,  depends: [P2-18],         checkpoint: false, status: done}
+  - {id: P2-20, epic: K, layer: frontend, title: Compliance calendar screen,             fr: FR-CMP-1,  depends: [P2-18, P2-19],  checkpoint: false, status: done}
+
+  # --- Epic L: delegation of authority & resolution thresholds (CAMA) ---
+  - {id: P2-21, epic: L, layer: backend,  title: Thresholds, special resolutions & DoA,  fr: FR-RES-5,  depends: [],              checkpoint: true,  status: needs-review}
+  - {id: P2-22, epic: L, layer: frontend, title: DoA matrix screen,                       fr: FR-RES-5,  depends: [P2-21],         checkpoint: false, status: done}
+
+  # --- Epic M: document lifecycle (retention / offline / annotations) ---
+  - {id: P2-23, epic: M, layer: backend,  title: Retention, legal hold & secure purge,   fr: FR-DOC-5,  depends: [],              checkpoint: true,  status: needs-review}
+  - {id: P2-24, epic: M, layer: backend,  title: Offline packs with remote wipe,         fr: FR-DOC-6,  depends: [],              checkpoint: false, status: done}
+  - {id: P2-25, epic: M, layer: backend,  title: Document annotations,                   fr: FR-DOC-4,  depends: [],              checkpoint: false, status: done}
+  - {id: P2-26, epic: M, layer: frontend, title: Document lifecycle UI,                   fr: FR-DOC-5,  depends: [P2-23, P2-24, P2-25], checkpoint: false, status: done}
+
+  # --- Epic N: meetings enhancements ---
+  - {id: P2-27, epic: N, layer: backend,  title: In-meeting mode,                        fr: FR-MTG-7,  depends: [],              checkpoint: false, status: done}
+  - {id: P2-28, epic: N, layer: backend,  title: Virtual meeting integration,            fr: FR-MTG-6,  depends: [],              checkpoint: false, status: done}
+  - {id: P2-29, epic: N, layer: backend,  title: Group vs entity aggregation views,      fr: FR-ENT-2,  depends: [],              checkpoint: false, status: done}
+  - {id: P2-30, epic: N, layer: frontend, title: In-meeting mode & group views UI,        fr: FR-MTG-7,  depends: [P2-27, P2-28, P2-29], checkpoint: false, status: done}
+
+  # --- Epic O: actions & notifications enhancements ---
+  - {id: P2-31, epic: O, layer: backend,  title: Reminders, escalation & evidence,       fr: FR-ACT-2,  depends: [],              checkpoint: false, status: done}
+  - {id: P2-32, epic: O, layer: backend,  title: Overdue-actions dashboard,              fr: FR-ACT-3,  depends: [P2-31],         checkpoint: false, status: done}
+  - {id: P2-33, epic: O, layer: backend,  title: Announcements with read receipts,       fr: FR-NOT-2,  depends: [],              checkpoint: false, status: done}
+  - {id: P2-34, epic: O, layer: frontend, title: Actions & announcements UI,              fr: FR-ACT-3,  depends: [P2-31, P2-32, P2-33], checkpoint: false, status: done}
+
+  # --- Epic P: search & regulator exports ---
+  - {id: P2-35, epic: P, layer: backend,  title: Global permission-scoped search,        fr: FR-RPT-1,  depends: [P2-01, P2-10],  checkpoint: true,  status: needs-review}
+  - {id: P2-36, epic: P, layer: backend,  title: Regulator-ready exports,                fr: FR-RPT-3,  depends: [P2-01, P2-03, P2-10], checkpoint: false, status: done}
+  - {id: P2-37, epic: P, layer: frontend, title: Search & exports UI,                     fr: FR-RPT-1,  depends: [P2-35, P2-36],  checkpoint: false, status: done}
+
+  # --- Epic Q: platform NFRs ---
+  - {id: P2-38, epic: Q, layer: backend,  title: Backup & disaster-recovery mode,        fr: NFR-REL-1, depends: [],              checkpoint: false, status: todo}
+  - {id: P2-39, epic: Q, layer: frontend, title: Accessibility & low-bandwidth mode,      fr: NFR-A11Y-1, depends: [],             checkpoint: false, status: todo}

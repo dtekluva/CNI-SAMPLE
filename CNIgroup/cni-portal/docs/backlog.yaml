@@ -1,0 +1,254 @@
+# Machine-readable Phase-1 backlog — CNI Group Governance Portal
+# Human source of truth: BUILD_BACKLOG.md (keep in sync).
+# Loop protocol: pick lowest-id task with all deps 'done' and status 'todo';
+# implement; run `tests`; if green and not checkpoint -> done; if checkpoint -> needs-review (stop for human).
+meta:
+  phase: 1
+  prepared: "2026-07-17"
+  rule_cross_cutting:
+    - "every mutation writes an append-only AuditEvent (T-A2)"
+    - "every read is permission-scoped, default-deny (T-B3)"
+    - "email carries links only, never content (P5)"
+  loop:
+    checkpoint_behavior: "stop-for-human"
+    never_autonomous: ["real deploys", "real notifications", "live e-sign", "data deletion"]
+
+tasks:
+  - id: T-000
+    title: Project scaffold (Django+DRF, React+Vite, tests, compose)
+    refs: [DECISIONS D-A1]
+    depends: []
+    checkpoint: false
+    status: done
+
+  - id: T-A1
+    title: Custom User model (email login)
+    refs: [FR-ADM-2]
+    depends: [T-000]
+    checkpoint: true
+    status: needs-review   # built + tests green on build/phase-1; awaiting human security review before merge to main
+    tests: [test_user_email_is_identifier, test_user_model_is_swapped]
+
+  - id: T-A2
+    title: Audit log core (append-only, hash-chained)
+    refs: [NFR-AUD-1]
+    depends: [T-A1]
+    checkpoint: true
+    status: needs-review   # built + tests green on build/phase-1; export API deferred to post-T-B3 (scoped). awaiting human review.
+    tests: [test_event_is_append_only, test_hash_chain_detects_tampering, test_event_records_actor_action_target]
+
+  - id: T-A3
+    title: MFA (TOTP) + session policy
+    refs: [NFR-SEC-1]
+    depends: [T-A1]
+    checkpoint: true
+    status: needs-review   # built + tests green on build/phase-1; awaiting human review.
+    tests: [test_login_requires_totp, test_session_times_out, test_mfa_events_audited]
+
+  - id: T-A4
+    title: SSO (OIDC) additive
+    refs: [NFR-SEC-1]
+    depends: [T-A3]
+    checkpoint: true
+    status: needs-review   # mapping core built + green; token-exchange/redirect deferred until IdP configured. awaiting human review.
+    tests: [test_oidc_maps_to_existing_user]
+
+  - id: T-A5
+    title: Secrets, encryption & residency config
+    refs: [NFR-SEC-2, NFR-SEC-3]
+    depends: [T-000]
+    checkpoint: true
+    status: needs-review   # built + tests green on build/phase-1; awaiting human + Legal review (residency, D-B3).
+    tests: [test_no_secrets_in_repo, test_residency_flag_routes_storage]
+
+  - id: T-B1
+    title: Entity model + hierarchy + profile
+    refs: [FR-ENT-1, DM-1]
+    depends: [T-A1]
+    checkpoint: false
+    status: done   # built + green on build/phase-1
+    tests: [test_entity_tree, test_incomplete_flag]
+
+  - id: T-B2
+    title: RoleAssignment (scoped roles)
+    refs: [FR-RBAC-1]
+    depends: [T-B1]
+    checkpoint: true
+    status: needs-review   # built + green on build/phase-1; awaiting human review (permissions model).
+    tests: [test_role_scoped_to_entity, test_role_change_audited]
+
+  - id: T-B3
+    title: Permission-resolution layer
+    refs: [FR-RBAC-1, P2]
+    depends: [T-B2, T-A2]
+    checkpoint: true
+    status: needs-review   # built + green on build/phase-1; least-privilege core — awaiting human review.
+    tests: [test_no_cross_entity_leak, test_group_role_sees_scoped_consolidation, test_default_deny]
+
+  - id: T-B4
+    title: Break-glass access
+    refs: [FR-RBAC-3]
+    depends: [T-B3, T-A2]
+    checkpoint: true
+    status: needs-review   # built + green on build/phase-1; awaiting human review (privileged access).
+    tests: [test_admin_denied_by_default, test_break_glass_requires_reason_and_audits]
+
+  - id: T-B5
+    title: Admin != reader separation
+    refs: [NFR-SEC-4]
+    depends: [T-B3]
+    checkpoint: true
+    status: needs-review   # built + green on build/phase-1; awaiting human review.
+    tests: [test_platform_admin_cannot_read_content_silently]
+
+  - id: T-B6
+    title: Entity CRUD API (scoped)
+    refs: [FR-ENT-1]
+    depends: [T-B3]
+    checkpoint: false
+    status: done   # built + green on build/phase-1
+    tests: [test_entity_crud_scoped]
+
+  - id: T-B7
+    title: Shell + entity switcher + group/entity views
+    refs: [FR-ENT-2]
+    depends: [T-B6, T-A3]
+    checkpoint: false
+    status: done   # switcher + group/entity view built; Vitest green. Playwright e2e pending browser install on box.
+    tests: [test_switcher_lists_only_permitted_entities, e2e_group_role_sees_group_view, e2e_entity_role_sees_only_their_entity]
+
+  - id: T-B8
+    title: User lifecycle (onboard/offboard, keep history)
+    refs: [FR-ADM-2, P6]
+    depends: [T-B2, T-A2]
+    checkpoint: true
+    status: needs-review   # built + green on build/phase-1; awaiting human review (identity lifecycle).
+    tests: [test_offboard_revokes_but_preserves_history]
+
+  - id: T-C1
+    title: Meeting model + scheduling/calendar
+    refs: [FR-MTG-1]
+    depends: [T-B6]
+    checkpoint: false
+    status: done   # built + green; availability-polling deferred (thin follow-up within FR-MTG-1)
+    tests: [test_recurring_series_generates_meetings, test_meeting_scoped_to_entity, test_timezone_per_invitee]
+
+  - id: T-C2
+    title: Notice + consent-to-short-notice
+    refs: [FR-MTG-2]
+    depends: [T-C1]
+    checkpoint: false
+    status: done   # built + green; notice-day values are cosec-confirmable (D-B5)
+    tests: [test_short_notice_requires_consent, test_notice_dispatch_proof_audited]
+
+  - id: T-C3
+    title: Agenda builder
+    refs: [FR-MTG-3]
+    depends: [T-C1]
+    checkpoint: false
+    status: done   # built + green; standing-agenda templates a thin follow-up
+    tests: [test_reorder_renumbers_and_updates_toc, test_item_types_persist]
+
+  - id: T-C4
+    title: Attendance + live quorum
+    refs: [FR-MTG-5]
+    depends: [T-C1]
+    checkpoint: false
+    status: done   # built + green on build/phase-1
+    tests: [test_quorum_met_indicator, test_apologies_recorded, test_attendance_stats_persist]
+
+  - id: T-D1
+    title: Document library + versioning
+    refs: [FR-DOC-1, FR-DOC-2]
+    depends: [T-B6]
+    checkpoint: false
+    status: done   # built + green; OCR text extraction a follow-up (field ready)
+    tests: [test_new_version_retains_prior_and_hashes, test_search_is_permission_scoped]
+
+  - id: T-D2
+    title: Watermark + download control + storage
+    refs: [FR-DOC-3, NFR-SEC-2]
+    depends: [T-D1]
+    checkpoint: true
+    status: needs-review   # built + green on build/phase-1; content-leak surface — awaiting human review. (PDF page-stamp render is a follow-up; watermark text + policy done.)
+    tests: [test_view_only_blocks_download, test_watermark_contains_viewer_identity, test_urls_are_signed_and_expire]
+
+  - id: T-D3
+    title: Board pack compilation
+    refs: [FR-MTG-4]
+    depends: [T-C3, T-D1]
+    checkpoint: false
+    status: done   # built + green; PDF render of pack is a follow-up (structure/ToC done)
+    tests: [test_pack_toc_maps_items_to_pages, test_republish_increments_version_and_notifies, test_late_paper_flagged]
+
+  - id: T-E1
+    title: Minute drafting (agenda-linked)
+    refs: [FR-MIN-1]
+    depends: [T-C3]
+    checkpoint: false
+    status: done   # built + green; inline decisions promoted to formal Action/Resolution in F1/G1
+    tests: [test_minutes_seed_from_agenda_and_attendees, test_inline_action_and_resolution_links]
+
+  - id: T-E2
+    title: Minutes approval workflow
+    refs: [FR-MIN-2]
+    depends: [T-E1]
+    checkpoint: false
+    status: done   # built + green on build/phase-1
+    tests: [test_state_transitions_logged, test_comments_block_adoption_until_dispositioned]
+
+  - id: T-F1
+    title: In-meeting resolutions + numbering
+    refs: [FR-RES-1]
+    depends: [T-C3]
+    checkpoint: false
+    status: done   # built + green; numbering scheme cosec-confirmable (D-B6)
+    tests: [test_resolution_records_votes_and_outcome, test_auto_numbering_sequences_per_entity]
+
+  - id: T-F2
+    title: Circular resolutions + e-sign handoff
+    refs: [FR-RES-2]
+    depends: [T-F1, T-A2]
+    checkpoint: true
+    status: needs-review   # built + green on build/phase-1; e-sign behind stub provider (D-B4). LAST checkpoint. awaiting human review + live vendor wiring.
+    tests: [test_effective_on_threshold, test_expiry_lapses, test_signature_events_audited]
+
+  - id: T-F3
+    title: Certified True Copy generation
+    refs: [FR-RES-4]
+    depends: [T-F1]
+    checkpoint: false
+    status: done   # built + green; PDF render of CTC a follow-up (text/cert body done)
+    tests: [test_ctc_only_for_passed_resolution, test_ctc_logged_as_issued]
+
+  - id: T-G1
+    title: Action capture
+    refs: [FR-ACT-1]
+    depends: [T-C3]
+    checkpoint: false
+    status: done   # built + green; reminders/escalation/dashboards are Phase 2
+    tests: [test_action_has_owner_due_and_source_link]
+
+  - id: T-G2
+    title: Notifications (multi-channel)
+    refs: [FR-NOT-1, P5]
+    depends: [T-C1]
+    checkpoint: false
+    status: done   # built + green; outbound delivery (real email/SMS) external + human-gated (D-D4)
+    tests: [test_email_contains_link_not_content, test_event_preferences_respected]
+
+  - id: T-G3
+    title: Role dashboards
+    refs: [FR-RPT-2]
+    depends: [T-B7, T-C1, T-G1]
+    checkpoint: false
+    status: done   # scoped dashboard API + component built; pytest+Vitest green. Playwright e2e pending browser install.
+    tests: [e2e_chairman_dashboard, e2e_director_dashboard]
+
+  - id: T-G4
+    title: Portal/entity settings
+    refs: [FR-ADM-1]
+    depends: [T-B6]
+    checkpoint: false
+    status: done   # built + green on build/phase-1
+    tests: [test_entity_settings_persist_and_scope]

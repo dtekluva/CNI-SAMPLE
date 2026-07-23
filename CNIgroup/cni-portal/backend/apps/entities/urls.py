@@ -1,0 +1,8 @@
+from rest_framework.routers import DefaultRouter
+
+from .api import EntityViewSet
+
+router = DefaultRouter()
+router.register("entities", EntityViewSet, basename="entity")
+
+urlpatterns = router.urls

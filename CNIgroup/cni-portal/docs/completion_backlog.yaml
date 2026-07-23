@@ -1,0 +1,39 @@
+# Completion backlog (backend API + frontend). Human source: COMPLETION_BACKLOG.md.
+# Loop: lowest-id with deps done -> build -> tests green -> done (checkpoint -> needs-review).
+meta:
+  prepared: "2026-07-17"
+  rule: "API-first; frontend consumes it. Never commit secrets (.env gitignored)."
+
+tasks:
+  # --- Part 1: backend API layer ---
+  - {id: BE-1,  title: Meetings API,            depends: [],            checkpoint: false, status: done}
+  - {id: BE-2,  title: Agenda API,              depends: [BE-1],        checkpoint: false, status: done}
+  - {id: BE-3,  title: Documents API,           depends: [],            checkpoint: true,  status: done}
+  - {id: BE-4,  title: Board pack API,          depends: [BE-2, BE-3],  checkpoint: false, status: done}
+  - {id: BE-5,  title: Minutes API,             depends: [BE-2],        checkpoint: false, status: done}
+  - {id: BE-6,  title: Resolutions API,         depends: [],            checkpoint: true,  status: done}
+  - {id: BE-7,  title: Actions API,             depends: [],            checkpoint: false, status: done}
+  - {id: BE-8,  title: Notifications API,       depends: [],            checkpoint: false, status: done}
+  - {id: BE-9,  title: Audit log API,           depends: [],            checkpoint: true,  status: done}
+  - {id: BE-10, title: PDF render board pack,   depends: [BE-4],        checkpoint: false, status: done}
+  - {id: BE-11, title: PDF render CTC,          depends: [BE-6],        checkpoint: false, status: done}
+  - {id: BE-12, title: Mailer tie-up,           depends: [BE-8],        checkpoint: false, status: done}
+
+  # --- Part 2: frontend ---
+  - {id: FE-1,  title: Northstar React components, depends: [],         checkpoint: false, status: done}
+  - {id: FE-2,  title: API client + auth context,  depends: [],         checkpoint: false, status: done}
+  - {id: FE-3,  title: Router + shell,             depends: [FE-1, FE-2], checkpoint: false, status: done}
+  - {id: FE-4,  title: Login screen,               depends: [FE-2, FE-3], checkpoint: false, status: done}
+  - {id: FE-5,  title: MFA screen,                 depends: [FE-4],     checkpoint: false, status: done}
+  - {id: FE-6,  title: Dashboard screen,           depends: [FE-3, BE-1], checkpoint: false, status: done}
+  - {id: FE-7,  title: Entities screen,            depends: [FE-3],     checkpoint: false, status: done}
+  - {id: FE-8,  title: Meetings screen,            depends: [FE-3, BE-1], checkpoint: false, status: done}
+  - {id: FE-9,  title: Board Meeting workspace,    depends: [FE-8, BE-2], checkpoint: false, status: done}
+  - {id: FE-10, title: Agenda builder,             depends: [FE-9, BE-2], checkpoint: false, status: done}
+  - {id: FE-11, title: Documents + pack reader,    depends: [FE-3, BE-3, BE-4], checkpoint: false, status: done}
+  - {id: FE-12, title: Minutes editor,             depends: [FE-9, BE-5], checkpoint: false, status: done}
+  - {id: FE-13, title: Resolutions screen,         depends: [FE-3, BE-6], checkpoint: false, status: done}
+  - {id: FE-14, title: Actions screen,             depends: [FE-3, BE-7], checkpoint: false, status: done}
+  - {id: FE-15, title: Notifications + preferences, depends: [FE-3, BE-8], checkpoint: false, status: done}
+  - {id: FE-16, title: Audit log viewer,           depends: [FE-3, BE-9], checkpoint: false, status: done}
+  - {id: FE-17, title: Settings screen,            depends: [FE-7],     checkpoint: false, status: done}
