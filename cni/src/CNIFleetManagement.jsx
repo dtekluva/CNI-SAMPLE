@@ -200,6 +200,19 @@ const CNIFleetManagementUI = () => {
   const [companyForm, setCompanyForm] = useState({ name: 'CNI Fleet Management', rc: 'RC-482013', address: '14 Adeola Odeku Street, Victoria Island, Lagos', email: 'ops@cnifleet.ng', phone: '0700-264-3538' });
   const [companySaved, setCompanySaved] = useState(false);
 
+  // Booking calendar month (0-indexed month); defaults to where the demo bookings live
+  const [calDate, setCalDate] = useState({ y: 2026, m: 0 });
+
+  // Vehicle detail actions + Mailgun (browser-persisted, demo only)
+  const [showVehicleDocs, setShowVehicleDocs] = useState(false);
+  const [editingVehicle, setEditingVehicle] = useState(null);
+  const [expiryNotice, setExpiryNotice] = useState(null);
+  const [selectedJob, setSelectedJob] = useState(null);
+  const [selectedInvoice, setSelectedInvoice] = useState(null);
+  const [mailgun, setMailgun] = useState(() => {
+    try { return JSON.parse(localStorage.getItem('cni_mailgun') || '{}'); } catch { return {}; }
+  });
+
   // Color palette
   const colors = {
     primary: '#1F4788',
@@ -322,7 +335,7 @@ const CNIFleetManagementUI = () => {
   ];
 
   // Fleet Management Data - Complete Vehicle Database
-  const fleetVehicles = [
+  const [fleetVehicles, setFleetVehicles] = useState([
     {
       id: 'LA-001',
       name: 'Toyota Camry 2023',
@@ -698,7 +711,38 @@ const CNIFleetManagementUI = () => {
         { date: '2025-10-05', type: 'Clutch Replacement', cost: 280000, vendor: 'AutoFix Lagos', mileage: 85000 },
       ]
     },
-  ];
+  ]);
+
+  // Persist a vehicle edit
+  const saveVehicle = (updated) => {
+    setFleetVehicles(vs => vs.map(x => x.id === updated.id ? updated : x));
+    setSelectedVehicle(sv => (sv && sv.id === updated.id ? updated : sv));
+  };
+  // Save Mailgun config to the browser (demo only — key lives in localStorage, never committed/bundled)
+  const saveMailgun = (cfg) => { setMailgun(cfg); try { localStorage.setItem('cni_mailgun', JSON.stringify(cfg)); } catch (e) {} };
+  // Send an email via Mailgun using the browser-stored key; falls back to a compose-preview
+  const sendViaMailgun = async ({ to, subject, text }) => {
+    const { key, domain } = mailgun;
+    if (!key || !domain) {
+      setExpiryNotice({ to, subject, text, ok: false, note: 'No Mailgun key configured. Add it in Settings → Integrations to send for real. Below is the email that would be sent.' });
+      return;
+    }
+    try {
+      const res = await fetch(`https://api.mailgun.net/v3/${domain}/messages`, {
+        method: 'POST',
+        headers: { Authorization: 'Basic ' + btoa('api:' + key), 'Content-Type': 'application/x-www-form-urlencoded' },
+        body: new URLSearchParams({ from: mailgun.from || `CNI Fleet <postmaster@${domain}>`, to, subject, text }),
+      });
+      setExpiryNotice({ to, subject, text, ok: res.ok, note: res.ok ? 'Sent via Mailgun ✓' : `Mailgun returned ${res.status}. Browser→Mailgun is often blocked by CORS — a small serverless proxy holding the key fixes this in production.` });
+    } catch (e) {
+      setExpiryNotice({ to, subject, text, ok: false, note: 'Browser could not reach Mailgun (likely CORS). In production a serverless proxy holds the key and sends; composed email shown below.' });
+    }
+  };
+  const emailDocExpiry = (vehicle, doc) => sendViaMailgun({
+    to: mailgun.notify || 'fleet@cnifleet.ng',
+    subject: `Action needed — ${doc.type} for ${vehicle.registrationNo} expires ${doc.expiry}`,
+    text: `Automated reminder from the CNI Fleet Management System.\n\nVehicle:      ${vehicle.name} (${vehicle.registrationNo})\nDocument:     ${doc.type}\nExpiry date:  ${doc.expiry}\nStatus:       ${(doc.status || '').toUpperCase()}\n\nPlease arrange renewal before the expiry date to avoid fines and voided insurance cover.\n\n— CNI Fleet Management`,
+  });
 
   // Fleet statistics
   const fleetStats = {
@@ -1268,7 +1312,12 @@ const CNIFleetManagementUI = () => {
               onMouseLeave={(e) => e.currentTarget.style.backgroundColor = idx % 2 === 0 ? colors.white : '#FAFBFC'}
               >
                 <td style={{ padding: '16px 20px' }}>
-                  <div style={{ fontSize: '14px', fontWeight: '700', color: colors.primary }}>{booking.id}</div>
+                  <div
+                    onClick={() => { setSelectedBooking(booking); setBookingsSubView('details'); }}
+                    onMouseOver={(e) => e.currentTarget.style.textDecorationColor = colors.primary}
+                    onMouseOut={(e) => e.currentTarget.style.textDecorationColor = 'transparent'}
+                    style={{ fontSize: '14px', fontWeight: '700', color: colors.primary, cursor: 'pointer', textDecoration: 'underline', textDecorationColor: 'transparent', textUnderlineOffset: '3px', display: 'inline-block' }}
+                  >{booking.id}</div>
                   <div style={{ fontSize: '11px', color: colors.mediumGrey, marginTop: '2px', textTransform: 'uppercase' }}>
                     {booking.bookingType}
                   </div>
@@ -2189,7 +2238,12 @@ const CNIFleetManagementUI = () => {
                 <Button variant="secondary" icon={Download} size="medium" style={{ width: '100%', justifyContent: 'center' }}>
                   Download PDF
                 </Button>
-                <Button variant="secondary" icon={Send} size="medium" style={{ width: '100%', justifyContent: 'center' }}>
+                <Button variant="secondary" icon={Send} size="medium" style={{ width: '100%', justifyContent: 'center' }}
+                  onClick={() => sendViaMailgun({
+                    to: selectedBooking.customer?.email || mailgun.notify || 'customer@client.ng',
+                    subject: `Your C&I Leasing booking ${selectedBooking.id} — ${selectedBooking.vehicle?.name}`,
+                    text: `Dear ${selectedBooking.customer?.name || 'Customer'},\n\nThank you for booking with C&I Leasing. Your booking details:\n\nBooking ref:  ${selectedBooking.id}\nVehicle:      ${selectedBooking.vehicle?.name}\nPeriod:       ${selectedBooking.startDate} to ${selectedBooking.endDate} (${selectedBooking.days} days)\nDriver:       ${selectedBooking.withDriver ? (selectedBooking.driver || 'Assigned') : 'Self-drive'}\nAmount:       ${selectedBooking.amount}\nStatus:       ${selectedBooking.status}\n\nFor any changes, reply to this email or call our office.\n\n— C&I Leasing Plc`,
+                  })}>
                   Email to Customer
                 </Button>
               </div>
@@ -2222,29 +2276,81 @@ const CNIFleetManagementUI = () => {
   };
 
   // Calendar View (Placeholder)
-  const CalendarView = () => (
-    <div style={{ padding: '32px' }}>
-      <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '24px' }}>
-        <h2 style={{ fontSize: '24px', fontWeight: '700', color: colors.darkGrey, margin: 0 }}>
-          Booking Calendar
-        </h2>
-        <Button variant="secondary" icon={Calendar} onClick={() => setBookingsSubView('list')}>
-          List View
-        </Button>
+  const CalendarView = () => {
+    const MONTHS = ['January', 'February', 'March', 'April', 'May', 'June', 'July', 'August', 'September', 'October', 'November', 'December'];
+    const DOW = ['Sun', 'Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat'];
+    const statusColor = { active: colors.success, confirmed: colors.info, pending: colors.warning, completed: colors.mediumGrey, cancelled: colors.danger };
+    const { y, m } = calDate;
+    const firstDow = new Date(y, m, 1).getDay();
+    const daysInMonth = new Date(y, m + 1, 0).getDate();
+    const pad = n => String(n).padStart(2, '0');
+    const move = (delta) => setCalDate(({ y, m }) => {
+      const nm = m + delta;
+      if (nm < 0) return { y: y - 1, m: 11 };
+      if (nm > 11) return { y: y + 1, m: 0 };
+      return { y, m: nm };
+    });
+    const cells = [];
+    for (let i = 0; i < firstDow; i++) cells.push(null);
+    for (let d = 1; d <= daysInMonth; d++) cells.push(d);
+    const bookingsOn = (d) => {
+      const ds = `${y}-${pad(m + 1)}-${pad(d)}`;
+      return allBookings.filter(b => b.startDate && b.endDate && b.startDate <= ds && ds <= b.endDate);
+    };
+    const monthCount = allBookings.filter(b => b.startDate && b.startDate.slice(0, 7) === `${y}-${pad(m + 1)}`).length;
+
+    return (
+      <div style={{ padding: '32px' }}>
+        <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '20px', flexWrap: 'wrap', gap: '12px' }}>
+          <div style={{ display: 'flex', alignItems: 'center', gap: '14px' }}>
+            <h2 style={{ fontSize: '22px', fontWeight: '700', color: colors.darkGrey, margin: 0 }}>Booking Calendar</h2>
+            <div style={{ display: 'flex', alignItems: 'center', gap: '4px' }}>
+              <button onClick={() => move(-1)} style={{ width: '34px', height: '34px', borderRadius: '8px', border: `1px solid ${colors.lightGrey}`, background: colors.white, cursor: 'pointer', display: 'flex', alignItems: 'center', justifyContent: 'center' }}><ChevronLeft size={18} color={colors.darkGrey} /></button>
+              <span style={{ minWidth: '150px', textAlign: 'center', fontWeight: '700', color: colors.darkGrey, fontSize: '15px' }}>{MONTHS[m]} {y}</span>
+              <button onClick={() => move(1)} style={{ width: '34px', height: '34px', borderRadius: '8px', border: `1px solid ${colors.lightGrey}`, background: colors.white, cursor: 'pointer', display: 'flex', alignItems: 'center', justifyContent: 'center' }}><ChevronRight size={18} color={colors.darkGrey} /></button>
+            </div>
+            <span style={{ fontSize: '13px', color: colors.mediumGrey }}>{monthCount} booking{monthCount === 1 ? '' : 's'} this month</span>
+          </div>
+          <Button variant="secondary" icon={FileText} onClick={() => setBookingsSubView('list')}>List View</Button>
+        </div>
+
+        <div style={{ display: 'flex', gap: '16px', marginBottom: '14px', flexWrap: 'wrap' }}>
+          {Object.entries(statusColor).map(([k, c]) => (
+            <span key={k} style={{ display: 'inline-flex', alignItems: 'center', gap: '6px', fontSize: '12px', color: colors.mediumGrey, textTransform: 'capitalize' }}>
+              <span style={{ width: '10px', height: '10px', borderRadius: '3px', backgroundColor: c }} /> {k}
+            </span>
+          ))}
+        </div>
+
+        <div style={{ backgroundColor: colors.white, borderRadius: '12px', border: `1px solid ${colors.lightGrey}`, overflow: 'hidden' }}>
+          <div style={{ display: 'grid', gridTemplateColumns: 'repeat(7, 1fr)', backgroundColor: '#F8F9FB', borderBottom: `1px solid ${colors.lightGrey}` }}>
+            {DOW.map(d => (
+              <div key={d} style={{ padding: '10px', textAlign: 'center', fontSize: '12px', fontWeight: '700', color: colors.mediumGrey, textTransform: 'uppercase', letterSpacing: '0.04em' }}>{d}</div>
+            ))}
+          </div>
+          <div style={{ display: 'grid', gridTemplateColumns: 'repeat(7, 1fr)' }}>
+            {cells.map((d, i) => {
+              const list = d ? bookingsOn(d) : [];
+              return (
+                <div key={i} style={{ minHeight: '104px', borderRight: (i % 7 !== 6) ? `1px solid ${colors.lightGrey}` : 'none', borderBottom: `1px solid ${colors.lightGrey}`, padding: '6px', backgroundColor: d ? colors.white : '#FCFCFD' }}>
+                  {d && <div style={{ fontSize: '12px', fontWeight: '700', color: colors.mediumGrey, marginBottom: '4px' }}>{d}</div>}
+                  <div style={{ display: 'flex', flexDirection: 'column', gap: '3px' }}>
+                    {list.slice(0, 3).map(b => (
+                      <div key={b.id} title={`${b.id} · ${b.customer?.name} · ${b.vehicle?.name} (${b.status})`}
+                        style={{ fontSize: '10px', fontWeight: '600', color: colors.white, backgroundColor: statusColor[b.status] || colors.mediumGrey, borderRadius: '4px', padding: '2px 5px', whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>
+                        {b.vehicle?.name?.split(' ').slice(0, 2).join(' ') || b.id}
+                      </div>
+                    ))}
+                    {list.length > 3 && <div style={{ fontSize: '10px', color: colors.mediumGrey, fontWeight: '600' }}>+{list.length - 3} more</div>}
+                  </div>
+                </div>
+              );
+            })}
+          </div>
+        </div>
       </div>
-      <div style={{
-        backgroundColor: colors.white,
-        padding: '80px',
-        borderRadius: '12px',
-        border: `1px solid ${colors.lightGrey}`,
-        textAlign: 'center',
-      }}>
-        <CalendarDays size={64} color={colors.mediumGrey} style={{ margin: '0 auto 20px' }} />
-        <h3 style={{ color: colors.darkGrey, margin: '0 0 12px 0' }}>Calendar View</h3>
-        <p style={{ color: colors.mediumGrey }}>Interactive calendar with booking visualization coming soon</p>
-      </div>
-    </div>
-  );
+    );
+  };
 
   // Success Modal
   const SuccessModal = () => (
@@ -3130,10 +3236,10 @@ const CNIFleetManagementUI = () => {
             Back to Fleet
           </button>
           <div style={{ display: 'flex', gap: '12px' }}>
-            <Button variant="ghost" icon={Edit}>Edit Vehicle</Button>
-            <Button variant="ghost" icon={Wrench}>Schedule Service</Button>
-            <Button variant="ghost" icon={FileText}>Documents</Button>
-            <Button icon={Navigation}>Track Live</Button>
+            <Button variant="ghost" icon={Edit} onClick={() => setEditingVehicle({ ...v })}>Edit Vehicle</Button>
+            <Button variant="ghost" icon={Wrench} onClick={() => setCurrentView('maintenance')}>Schedule Service</Button>
+            <Button variant="ghost" icon={FileText} onClick={() => setShowVehicleDocs(true)}>Documents</Button>
+            <Button icon={Navigation} onClick={() => setFleetSubView('map')}>Track Live</Button>
           </div>
         </div>
 
@@ -4371,8 +4477,8 @@ const CNIFleetManagementUI = () => {
                   const act = nextAction(r);
                   return (
                     <tr key={r.id} style={{ borderBottom: `1px solid ${colors.lightGrey}` }}>
-                      <td style={{ padding: '14px 16px' }}>
-                        <div style={{ fontWeight: '700', color: colors.darkGrey, fontSize: '14px' }}>{r.id}</div>
+                      <td style={{ padding: '14px 16px', cursor: 'pointer' }} onClick={() => setSelectedJob(r)}>
+                        <div style={{ display: 'inline-flex', alignItems: 'center', gap: '4px', fontWeight: '700', color: colors.primary, fontSize: '14px' }}>{r.id} <ChevronRight size={14} /></div>
                         <div style={{ fontSize: '12px', color: colors.mediumGrey, maxWidth: '260px' }}>{r.issue}</div>
                         <div style={{ display: 'inline-flex', alignItems: 'center', gap: '5px', marginTop: '4px', fontSize: '11px', fontWeight: '700', color: prio[r.priority] }}>
                           <Circle size={8} fill={prio[r.priority]} color={prio[r.priority]} /> {r.priority.toUpperCase()} PRIORITY
@@ -4476,7 +4582,11 @@ const CNIFleetManagementUI = () => {
               </thead>
               <tbody>
                 {rows.map(c => (
-                  <tr key={c.id} style={{ borderBottom: `1px solid ${colors.lightGrey}` }}>
+                  <tr key={c.id}
+                    onClick={() => setSelectedClient(c)}
+                    onMouseOver={e => { e.currentTarget.style.backgroundColor = '#F8F9FB'; }}
+                    onMouseOut={e => { e.currentTarget.style.backgroundColor = colors.white; }}
+                    style={{ borderBottom: `1px solid ${colors.lightGrey}`, cursor: 'pointer', backgroundColor: colors.white, transition: 'background-color 0.15s' }}>
                     <td style={{ padding: '14px 16px' }}>
                       <div style={{ fontWeight: '700', color: colors.darkGrey, fontSize: '14px' }}>{c.name}</div>
                       <div style={{ fontSize: '12px', color: colors.mediumGrey }}>{c.contact} · since {c.since}</div>
@@ -4491,8 +4601,8 @@ const CNIFleetManagementUI = () => {
                       <span style={{ padding: '5px 12px', borderRadius: '20px', fontSize: '12px', fontWeight: '700', backgroundColor: cmeta[c.status].bg, color: cmeta[c.status].fg, whiteSpace: 'nowrap' }}>{cmeta[c.status].label}</span>
                       {c.outstanding > 0 && <div style={{ fontSize: '11px', color: colors.danger, marginTop: '4px', fontWeight: '600' }}>{naira(c.outstanding)} due</div>}
                     </td>
-                    <td style={{ padding: '14px 16px' }}>
-                      <Button size="small" variant="secondary" icon={Eye} onClick={() => setSelectedClient(c)}>View</Button>
+                    <td style={{ padding: '14px 16px', textAlign: 'right' }}>
+                      <span style={{ display: 'inline-flex', alignItems: 'center', gap: '3px', fontSize: '13px', fontWeight: '600', color: colors.primary }}>View <ChevronRight size={16} /></span>
                     </td>
                   </tr>
                 ))}
@@ -4504,35 +4614,83 @@ const CNIFleetManagementUI = () => {
           </div>
         </div>
 
-        <Modal isOpen={!!selectedClient} onClose={() => setSelectedClient(null)} title={selectedClient ? selectedClient.name : ''} width="560px">
-          {selectedClient && (
-            <div style={{ display: 'flex', flexDirection: 'column', gap: '18px' }}>
-              <div style={{ display: 'flex', gap: '10px', alignItems: 'center' }}>
-                <span style={{ padding: '4px 10px', borderRadius: '6px', fontSize: '12px', fontWeight: '700', backgroundColor: `${segColor[selectedClient.segment]}18`, color: segColor[selectedClient.segment] }}>{selectedClient.segment}</span>
-                <span style={{ padding: '5px 12px', borderRadius: '20px', fontSize: '12px', fontWeight: '700', backgroundColor: cmeta[selectedClient.status].bg, color: cmeta[selectedClient.status].fg }}>{cmeta[selectedClient.status].label}</span>
+        <Modal isOpen={!!selectedClient} onClose={() => setSelectedClient(null)} title={selectedClient ? selectedClient.name : ''} width="660px">
+          {selectedClient && (() => {
+            const inv = invoicesData.filter(i => i.client === selectedClient.name);
+            const annual = selectedClient.monthly * 12;
+            const paidTotal = inv.filter(i => i.status === 'paid').reduce((s, i) => s + i.amount, 0);
+            const ctrRef = selectedClient.contractType === 'Walk-in' ? 'No standing contract' : 'CTR-' + selectedClient.id.replace('CL-', '') + '/2026';
+            const invColor = { paid: colors.success, pending: colors.warning, overdue: colors.danger };
+            const invLabel = { paid: 'Paid', pending: 'Pending', overdue: 'Overdue' };
+            const field = (k, v) => (
+              <div>
+                <div style={{ fontSize: '11px', color: colors.mediumGrey, textTransform: 'uppercase', letterSpacing: '0.04em', fontWeight: '700' }}>{k}</div>
+                <div style={{ fontSize: '14px', color: colors.darkGrey, marginTop: '2px', fontWeight: '600' }}>{v}</div>
               </div>
-              <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '14px' }}>
-                {[
-                  ['Contact', selectedClient.contact], ['Phone', selectedClient.phone], ['Email', selectedClient.email],
-                  ['Client since', selectedClient.since], ['Vehicles on contract', selectedClient.vehicles || '—'],
-                  ['Contract type', selectedClient.contractType], ['Monthly value', selectedClient.monthly ? naira(selectedClient.monthly) : '—'],
-                  ['Contract start', selectedClient.start], ['Renewal date', selectedClient.end],
-                  ['Outstanding', selectedClient.outstanding ? naira(selectedClient.outstanding) : '₦0'],
-                ].map(([k, v]) => (
-                  <div key={k}>
-                    <div style={{ fontSize: '11px', color: colors.mediumGrey, textTransform: 'uppercase', letterSpacing: '0.04em', fontWeight: '700' }}>{k}</div>
-                    <div style={{ fontSize: '14px', color: colors.darkGrey, marginTop: '2px' }}>{v}</div>
+            );
+            return (
+              <div style={{ display: 'flex', flexDirection: 'column', gap: '18px' }}>
+                <div style={{ display: 'flex', gap: '10px', alignItems: 'center' }}>
+                  <span style={{ padding: '4px 10px', borderRadius: '6px', fontSize: '12px', fontWeight: '700', backgroundColor: `${segColor[selectedClient.segment]}18`, color: segColor[selectedClient.segment] }}>{selectedClient.segment}</span>
+                  <span style={{ padding: '5px 12px', borderRadius: '20px', fontSize: '12px', fontWeight: '700', backgroundColor: cmeta[selectedClient.status].bg, color: cmeta[selectedClient.status].fg }}>{cmeta[selectedClient.status].label}</span>
+                  <span style={{ marginLeft: 'auto', fontFamily: 'monospace', fontSize: '13px', color: colors.mediumGrey }}>{ctrRef}</span>
+                </div>
+
+                {/* Contract summary */}
+                <div style={{ border: `1px solid ${colors.lightGrey}`, borderRadius: '12px', overflow: 'hidden' }}>
+                  <div style={{ backgroundColor: '#F8F9FB', padding: '10px 16px', fontSize: '12px', fontWeight: '700', color: colors.mediumGrey, textTransform: 'uppercase', letterSpacing: '0.04em', borderBottom: `1px solid ${colors.lightGrey}` }}>Contract</div>
+                  <div style={{ padding: '16px', display: 'grid', gridTemplateColumns: '1fr 1fr 1fr', gap: '16px' }}>
+                    {field('Type', selectedClient.contractType)}
+                    {field('Term', selectedClient.start === '—' ? '—' : `${selectedClient.start} → ${selectedClient.end}`)}
+                    {field('Billing', selectedClient.monthly ? 'Monthly' : '—')}
+                    {field('Vehicles on contract', selectedClient.vehicles || '—')}
+                    {field('Monthly value', selectedClient.monthly ? naira(selectedClient.monthly) : '—')}
+                    {field('Annualised', selectedClient.monthly ? naira(annual) : '—')}
+                    {field('Renewal date', selectedClient.end)}
+                    {field('Outstanding', <span style={{ color: selectedClient.outstanding ? colors.danger : colors.success }}>{selectedClient.outstanding ? naira(selectedClient.outstanding) : '₦0'}</span>)}
+                    {field('Paid to date', naira(paidTotal))}
                   </div>
-                ))}
+                </div>
+
+                {/* Contact */}
+                <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr 1fr', gap: '16px' }}>
+                  {field('Contact', selectedClient.contact)}
+                  {field('Phone', selectedClient.phone)}
+                  {field('Email', <span style={{ fontWeight: '400', fontSize: '13px' }}>{selectedClient.email}</span>)}
+                </div>
+
+                {/* Payment history */}
+                <div>
+                  <div style={{ fontSize: '12px', fontWeight: '700', color: colors.mediumGrey, textTransform: 'uppercase', letterSpacing: '0.04em', marginBottom: '8px' }}>Payment history</div>
+                  {inv.length ? (
+                    <div style={{ border: `1px solid ${colors.lightGrey}`, borderRadius: '10px', overflow: 'hidden' }}>
+                      {inv.map((i, idx) => (
+                        <div key={i.id} style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', padding: '10px 14px', borderTop: idx ? `1px solid ${colors.lightGrey}` : 'none' }}>
+                          <div>
+                            <span style={{ fontWeight: '700', color: colors.darkGrey, fontSize: '13px' }}>{i.id}</span>
+                            <span style={{ fontSize: '12px', color: colors.mediumGrey, marginLeft: '8px' }}>{i.type} · due {i.due}</span>
+                          </div>
+                          <div style={{ display: 'flex', alignItems: 'center', gap: '12px' }}>
+                            <span style={{ fontSize: '13px', fontWeight: '700', color: colors.darkGrey }}>{naira(i.amount)}</span>
+                            <span style={{ padding: '3px 10px', borderRadius: '20px', fontSize: '11px', fontWeight: '700', backgroundColor: `${invColor[i.status]}1e`, color: invColor[i.status] }}>{invLabel[i.status]}</span>
+                          </div>
+                        </div>
+                      ))}
+                    </div>
+                  ) : (
+                    <p style={{ fontSize: '13px', color: colors.mediumGrey, margin: 0 }}>No invoices on record for this client.</p>
+                  )}
+                </div>
+
+                <div style={{ display: 'flex', gap: '10px', justifyContent: 'flex-end', borderTop: `1px solid ${colors.lightGrey}`, paddingTop: '16px' }}>
+                  {selectedClient.status === 'renewal-due' && (
+                    <Button variant="success" icon={RefreshCw} onClick={() => { renewClient(selectedClient.id); setSelectedClient(null); }}>Renew contract</Button>
+                  )}
+                  <Button variant="secondary" onClick={() => setSelectedClient(null)}>Close</Button>
+                </div>
               </div>
-              <div style={{ display: 'flex', gap: '10px', justifyContent: 'flex-end', borderTop: `1px solid ${colors.lightGrey}`, paddingTop: '16px' }}>
-                {selectedClient.status === 'renewal-due' && (
-                  <Button variant="success" icon={RefreshCw} onClick={() => { renewClient(selectedClient.id); setSelectedClient(null); }}>Renew contract</Button>
-                )}
-                <Button variant="secondary" onClick={() => setSelectedClient(null)}>Close</Button>
-              </div>
-            </div>
-          )}
+            );
+          })()}
         </Modal>
       </div>
     );
@@ -4610,7 +4768,9 @@ const CNIFleetManagementUI = () => {
               <tbody>
                 {rows.map(i => (
                   <tr key={i.id} style={{ borderBottom: `1px solid ${colors.lightGrey}` }}>
-                    <td style={{ padding: '14px 16px', fontWeight: '700', color: colors.darkGrey, fontSize: '14px' }}>{i.id}</td>
+                    <td style={{ padding: '14px 16px', cursor: 'pointer' }} onClick={() => setSelectedInvoice(i)}>
+                      <span style={{ display: 'inline-flex', alignItems: 'center', gap: '4px', fontWeight: '700', color: colors.primary, fontSize: '14px' }}>{i.id} <ChevronRight size={14} /></span>
+                    </td>
                     <td style={{ padding: '14px 16px', fontSize: '13px', color: colors.darkGrey }}>{i.client}</td>
                     <td style={{ padding: '14px 16px' }}>
                       <span style={{ padding: '4px 10px', borderRadius: '6px', fontSize: '12px', fontWeight: '700', backgroundColor: i.type === 'Contract' ? `${colors.primary}18` : `${colors.accent}18`, color: i.type === 'Contract' ? colors.primary : colors.accent }}>{i.type}</span>
@@ -4812,19 +4972,45 @@ const CNIFleetManagementUI = () => {
         </div>
 
         {settingsTab === 'integrations' && (
-          <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(320px, 1fr))', gap: '16px' }}>
-            {integrations.map(x => (
-              <div key={x.key} style={{ ...card, padding: '18px 20px', display: 'flex', alignItems: 'flex-start', justifyContent: 'space-between', gap: '12px' }}>
-                <div>
-                  <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
-                    <span style={{ fontWeight: '700', color: colors.darkGrey, fontSize: '15px' }}>{x.name}</span>
-                    <span style={{ padding: '2px 8px', borderRadius: '20px', fontSize: '11px', fontWeight: '700', backgroundColor: x.connected ? '#D4EDDA' : colors.lightGrey, color: x.connected ? '#155724' : colors.mediumGrey }}>{x.connected ? 'Connected' : 'Off'}</span>
+          <div style={{ display: 'flex', flexDirection: 'column', gap: '20px' }}>
+            <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(320px, 1fr))', gap: '16px' }}>
+              {integrations.map(x => (
+                <div key={x.key} style={{ ...card, padding: '18px 20px', display: 'flex', alignItems: 'flex-start', justifyContent: 'space-between', gap: '12px' }}>
+                  <div>
+                    <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
+                      <span style={{ fontWeight: '700', color: colors.darkGrey, fontSize: '15px' }}>{x.name}</span>
+                      <span style={{ padding: '2px 8px', borderRadius: '20px', fontSize: '11px', fontWeight: '700', backgroundColor: x.connected ? '#D4EDDA' : colors.lightGrey, color: x.connected ? '#155724' : colors.mediumGrey }}>{x.connected ? 'Connected' : 'Off'}</span>
+                    </div>
+                    <p style={{ margin: '6px 0 0', fontSize: '13px', color: colors.mediumGrey, lineHeight: '1.4' }}>{x.desc}</p>
                   </div>
-                  <p style={{ margin: '6px 0 0', fontSize: '13px', color: colors.mediumGrey, lineHeight: '1.4' }}>{x.desc}</p>
+                  <Toggle on={x.connected} onClick={() => toggleIntegration(x.key)} />
                 </div>
-                <Toggle on={x.connected} onClick={() => toggleIntegration(x.key)} />
+              ))}
+            </div>
+
+            {/* Email delivery — Mailgun (key stored in this browser only) */}
+            <div style={{ ...card, padding: '20px' }}>
+              <div style={{ display: 'flex', alignItems: 'center', gap: '10px', marginBottom: '4px' }}>
+                <Mail size={18} color={colors.primary} />
+                <span style={{ fontWeight: '700', color: colors.darkGrey, fontSize: '15px' }}>Email delivery (Mailgun)</span>
+                <span style={{ padding: '2px 8px', borderRadius: '20px', fontSize: '11px', fontWeight: '700', backgroundColor: mailgun.key ? '#D4EDDA' : colors.lightGrey, color: mailgun.key ? '#155724' : colors.mediumGrey }}>{mailgun.key ? 'Configured' : 'Not set'}</span>
               </div>
-            ))}
+              <p style={{ margin: '0 0 14px', fontSize: '13px', color: colors.mediumGrey, lineHeight: '1.4' }}>
+                Powers document-expiry reminders, maintenance reports and invoices. The key is stored only in <b>this browser</b> (localStorage) — it is never committed to git or bundled into the app.
+              </p>
+              <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '14px' }}>
+                {[['Mailgun domain', 'domain', 'text', 'mg.yourdomain.com'], ['API key', 'key', 'password', 'key-xxxxxxxx'], ['Notify / send to', 'notify', 'text', 'fleet@cnifleet.ng'], ['From', 'from', 'text', 'CNI Fleet <postmaster@mg.yourdomain.com>']].map(([label, key, type, ph]) => (
+                  <div key={key}>
+                    <label style={{ display: 'block', fontSize: '11px', color: colors.mediumGrey, textTransform: 'uppercase', letterSpacing: '0.04em', fontWeight: '700', marginBottom: '5px' }}>{label}</label>
+                    <input type={type} placeholder={ph} value={mailgun[key] || ''} onChange={e => saveMailgun({ ...mailgun, [key]: e.target.value })}
+                      autoComplete="off" style={{ width: '100%', padding: '9px 12px', border: `1px solid ${colors.lightGrey}`, borderRadius: '8px', fontSize: '13px', color: colors.darkGrey, boxSizing: 'border-box' }} />
+                  </div>
+                ))}
+              </div>
+              <p style={{ margin: '12px 0 0', fontSize: '11px', color: colors.mediumGrey, fontStyle: 'italic' }}>
+                Saved automatically as you type. Note: browsers usually block direct calls to Mailgun (CORS) — for live sending in production, a tiny serverless proxy holds the key and relays the request.
+              </p>
+            </div>
           </div>
         )}
 
@@ -4898,6 +5084,224 @@ const CNIFleetManagementUI = () => {
           </div>
         )}
       </div>
+    );
+  };
+
+  // VEHICLE DOCUMENTS MODAL — sample Nigerian vehicle papers, populated with the vehicle's data
+  const VehicleDocsModal = () => {
+    if (!showVehicleDocs || !selectedVehicle) return null;
+    const v = selectedVehicle;
+    const docs = v.documents || [];
+    const lic = docs.find(d => /licen/i.test(d.type)) || { type: 'Vehicle License', expiry: v.registrationExpiry, status: 'valid' };
+    const rw = docs.find(d => /road/i.test(d.type)) || { type: 'Road Worthiness', expiry: '—', status: 'valid' };
+    const stColor = { valid: colors.success, expiring: colors.warning, expired: colors.danger };
+    const Row = ({ k, val }) => (
+      <div style={{ display: 'flex', justifyContent: 'space-between', padding: '5px 0', borderBottom: `1px dashed ${colors.lightGrey}`, fontSize: '12px' }}>
+        <span style={{ color: colors.mediumGrey }}>{k}</span><span style={{ fontWeight: '700', color: colors.darkGrey }}>{val}</span>
+      </div>
+    );
+    const OfficialDoc = ({ title, subtitle, refNo, expiry, rows, accent }) => (
+      <div style={{ border: `2px solid ${accent}`, borderRadius: '10px', overflow: 'hidden', flex: '1 1 300px', minWidth: '280px' }}>
+        <div style={{ backgroundColor: accent, color: colors.white, padding: '10px 14px' }}>
+          <div style={{ fontSize: '10px', letterSpacing: '0.08em', opacity: 0.9 }}>FEDERAL REPUBLIC OF NIGERIA</div>
+          <div style={{ fontSize: '14px', fontWeight: '800', letterSpacing: '0.02em' }}>{title}</div>
+          <div style={{ fontSize: '10px', opacity: 0.9 }}>{subtitle}</div>
+        </div>
+        <div style={{ padding: '14px', position: 'relative' }}>
+          <div style={{ position: 'absolute', inset: 0, display: 'flex', alignItems: 'center', justifyContent: 'center', pointerEvents: 'none' }}>
+            <span style={{ fontSize: '34px', fontWeight: '800', color: accent, opacity: 0.06, transform: 'rotate(-18deg)', whiteSpace: 'nowrap' }}>C&amp;I LEASING</span>
+          </div>
+          <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: '8px', fontSize: '11px', fontFamily: 'monospace', color: colors.mediumGrey }}>
+            <span>Ref: {refNo}</span><span>Expires: {expiry}</span>
+          </div>
+          {rows.map(([k, val]) => <Row key={k} k={k} val={val} />)}
+          <div style={{ marginTop: '10px', fontSize: '9px', color: colors.mediumGrey, fontStyle: 'italic' }}>Computer-generated sample document · not for official use</div>
+        </div>
+      </div>
+    );
+    return (
+      <Modal isOpen={showVehicleDocs} onClose={() => setShowVehicleDocs(false)} title={`Documents — ${v.name}`} width="820px">
+        <div style={{ display: 'flex', flexDirection: 'column', gap: '18px' }}>
+          <div style={{ display: 'flex', flexWrap: 'wrap', gap: '16px' }}>
+            <OfficialDoc
+              title="VEHICLE LICENCE" subtitle="Motor Vehicle Administration" accent="#1F7A46"
+              refNo={v.registrationNo} expiry={lic.expiry}
+              rows={[['Registration No', v.registrationNo], ['Make', v.make], ['Model', v.model], ['Year', v.year], ['Chassis No (VIN)', v.vin], ['Colour', v.color], ['Category', v.type], ['Registered Owner', 'C&I Leasing Plc']]}
+            />
+            <OfficialDoc
+              title="CERTIFICATE OF ROAD WORTHINESS" subtitle="Vehicle Inspection Office" accent="#1F4788"
+              refNo={'CRW-' + v.id} expiry={rw.expiry}
+              rows={[['Registration No', v.registrationNo], ['Make / Model', `${v.make} ${v.model}`], ['Result', 'PASS'], ['Odometer', (v.mileage || 0).toLocaleString() + ' km'], ['Inspected By', 'VIO Lagos'], ['Owner', 'C&I Leasing Plc']]}
+            />
+          </div>
+
+          <div>
+            <div style={{ fontSize: '12px', fontWeight: '700', color: colors.mediumGrey, textTransform: 'uppercase', letterSpacing: '0.04em', marginBottom: '8px' }}>Document register & expiry</div>
+            <div style={{ border: `1px solid ${colors.lightGrey}`, borderRadius: '10px', overflow: 'hidden' }}>
+              {docs.map((d, i) => (
+                <div key={d.type} style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', padding: '10px 14px', borderTop: i ? `1px solid ${colors.lightGrey}` : 'none' }}>
+                  <div>
+                    <span style={{ fontWeight: '700', color: colors.darkGrey, fontSize: '13px' }}>{d.type}</span>
+                    <span style={{ fontSize: '12px', color: colors.mediumGrey, marginLeft: '8px' }}>expires {d.expiry}</span>
+                  </div>
+                  <div style={{ display: 'flex', alignItems: 'center', gap: '10px' }}>
+                    <span style={{ padding: '3px 10px', borderRadius: '20px', fontSize: '11px', fontWeight: '700', backgroundColor: `${stColor[d.status] || colors.mediumGrey}1e`, color: stColor[d.status] || colors.mediumGrey, textTransform: 'capitalize' }}>{d.status}</span>
+                    <Button size="small" variant={d.status === 'valid' ? 'ghost' : 'secondary'} icon={Send} onClick={() => emailDocExpiry(v, d)}>Email reminder</Button>
+                  </div>
+                </div>
+              ))}
+            </div>
+          </div>
+        </div>
+      </Modal>
+    );
+  };
+
+  // EDIT VEHICLE MODAL
+  const EditVehicleModal = () => {
+    if (!editingVehicle) return null;
+    const e = editingVehicle;
+    const set = (k, val) => setEditingVehicle(prev => ({ ...prev, [k]: val }));
+    const inputStyle = { width: '100%', padding: '9px 12px', border: `1px solid ${colors.lightGrey}`, borderRadius: '8px', fontSize: '14px', color: colors.darkGrey, boxSizing: 'border-box' };
+    return (
+      <Modal isOpen={!!editingVehicle} onClose={() => setEditingVehicle(null)} title={`Edit — ${e.name}`} width="560px">
+        <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '14px' }}>
+          {[['Name', 'name'], ['Registration No', 'registrationNo'], ['Colour', 'color'], ['Assigned Driver', 'assignedDriver']].map(([label, key]) => (
+            <div key={key}>
+              <label style={{ display: 'block', fontSize: '11px', color: colors.mediumGrey, textTransform: 'uppercase', letterSpacing: '0.04em', fontWeight: '700', marginBottom: '5px' }}>{label}</label>
+              <input value={e[key] ?? ''} onChange={ev => set(key, ev.target.value)} style={inputStyle} />
+            </div>
+          ))}
+          <div>
+            <label style={{ display: 'block', fontSize: '11px', color: colors.mediumGrey, textTransform: 'uppercase', letterSpacing: '0.04em', fontWeight: '700', marginBottom: '5px' }}>Mileage (km)</label>
+            <input type="number" value={e.mileage ?? 0} onChange={ev => set('mileage', Number(ev.target.value))} style={inputStyle} />
+          </div>
+          <div>
+            <label style={{ display: 'block', fontSize: '11px', color: colors.mediumGrey, textTransform: 'uppercase', letterSpacing: '0.04em', fontWeight: '700', marginBottom: '5px' }}>Status</label>
+            <select value={e.status} onChange={ev => set('status', ev.target.value)} style={inputStyle}>
+              {['available', 'booked', 'active', 'maintenance', 'workshop', 'dormant'].map(s => <option key={s} value={s}>{s}</option>)}
+            </select>
+          </div>
+        </div>
+        <div style={{ display: 'flex', gap: '10px', justifyContent: 'flex-end', marginTop: '20px', borderTop: `1px solid ${colors.lightGrey}`, paddingTop: '16px' }}>
+          <Button variant="secondary" onClick={() => setEditingVehicle(null)}>Cancel</Button>
+          <Button icon={Check} onClick={() => { saveVehicle(e); setEditingVehicle(null); }}>Save changes</Button>
+        </div>
+      </Modal>
+    );
+  };
+
+  // EMAIL RESULT / PREVIEW MODAL (doc-expiry reminders + maintenance reports)
+  const ExpiryNoticeModal = () => {
+    if (!expiryNotice) return null;
+    const n = expiryNotice;
+    return (
+      <Modal isOpen={!!expiryNotice} onClose={() => setExpiryNotice(null)} title={n.ok ? 'Email sent' : 'Email preview'} width="600px">
+        <div style={{ display: 'flex', flexDirection: 'column', gap: '14px' }}>
+          <div style={{ display: 'flex', gap: '10px', alignItems: 'flex-start', padding: '12px 14px', borderRadius: '10px', backgroundColor: n.ok ? '#D4EDDA' : '#FFF3CD' }}>
+            {n.ok ? <CheckCircle size={18} color="#155724" style={{ flexShrink: 0, marginTop: '1px' }} /> : <AlertCircle size={18} color="#856404" style={{ flexShrink: 0, marginTop: '1px' }} />}
+            <span style={{ fontSize: '13px', color: n.ok ? '#155724' : '#856404', fontWeight: '600' }}>{n.note}</span>
+          </div>
+          <div style={{ border: `1px solid ${colors.lightGrey}`, borderRadius: '10px', overflow: 'hidden' }}>
+            <div style={{ padding: '10px 14px', borderBottom: `1px solid ${colors.lightGrey}`, fontSize: '13px' }}><b>To:</b> {n.to}</div>
+            <div style={{ padding: '10px 14px', borderBottom: `1px solid ${colors.lightGrey}`, fontSize: '13px' }}><b>Subject:</b> {n.subject}</div>
+            <pre style={{ margin: 0, padding: '14px', fontSize: '12px', color: colors.darkGrey, whiteSpace: 'pre-wrap', fontFamily: 'monospace', lineHeight: 1.5 }}>{n.text}</pre>
+          </div>
+          <div style={{ display: 'flex', justifyContent: 'flex-end' }}>
+            <Button variant="secondary" onClick={() => setExpiryNotice(null)}>Close</Button>
+          </div>
+        </div>
+      </Modal>
+    );
+  };
+
+  // MAINTENANCE JOB DETAIL MODAL
+  const MaintenanceJobModal = () => {
+    if (!selectedJob) return null;
+    const j = selectedJob;
+    const naira = n => '₦' + (n || 0).toLocaleString();
+    const meta = { pending: { label: 'Awaiting Approval', bg: '#FFF3CD', fg: '#856404' }, approved: { label: 'Approved', bg: '#CCE5FF', fg: '#004085' }, 'in-progress': { label: 'In Workshop', bg: '#D1ECF1', fg: '#0C5460' }, 'awaiting-parts': { label: 'Awaiting Parts', bg: '#E2D9F3', fg: '#4B2E83' }, completed: { label: 'Completed', bg: '#D4EDDA', fg: '#155724' } };
+    const addDays = (dateStr, n) => { const d = new Date(dateStr); d.setDate(d.getDate() + n); return d.toISOString().slice(0, 10); };
+    const outDays = j.priority === 'high' ? 2 : j.priority === 'medium' ? 4 : 6;
+    const expectedOut = addDays(j.date, outDays);
+    const field = (k, v) => (<div><div style={{ fontSize: '11px', color: colors.mediumGrey, textTransform: 'uppercase', letterSpacing: '0.04em', fontWeight: '700' }}>{k}</div><div style={{ fontSize: '14px', color: colors.darkGrey, marginTop: '2px', fontWeight: '600' }}>{v}</div></div>);
+    const emailReport = () => sendViaMailgun({
+      to: mailgun.notify || 'workshop@cnifleet.ng',
+      subject: `Maintenance report ${j.id} — ${j.vehicle} (${meta[j.status].label})`,
+      text: `MAINTENANCE JOB REPORT\n${j.id}\n\nVehicle:            ${j.vehicle} (${j.reg})\nOdometer:           ${j.mileage}\nType:               ${j.type}\nIssue:              ${j.issue}\nPriority:           ${(j.priority || '').toUpperCase()}\n\nWorkshop:           ${j.workshop}\nRequested by:       ${j.requestedBy}\nDate reported (in): ${j.date}\nExpected time out:  ${expectedOut}\nStatus:             ${meta[j.status].label}\n\nEstimated cost:     ${naira(j.cost)}\n\n— CNI Fleet Management, Maintenance`,
+    });
+    return (
+      <Modal isOpen={!!selectedJob} onClose={() => setSelectedJob(null)} title={`Maintenance — ${j.id}`} width="640px">
+        <div style={{ display: 'flex', flexDirection: 'column', gap: '18px' }}>
+          <div style={{ display: 'flex', alignItems: 'center', gap: '10px' }}>
+            <span style={{ padding: '5px 12px', borderRadius: '20px', fontSize: '12px', fontWeight: '700', backgroundColor: meta[j.status].bg, color: meta[j.status].fg }}>{meta[j.status].label}</span>
+            <span style={{ fontSize: '12px', fontWeight: '700', color: j.priority === 'high' ? colors.danger : j.priority === 'medium' ? colors.warning : colors.mediumGrey, textTransform: 'uppercase' }}>{j.priority} priority</span>
+            <span style={{ marginLeft: 'auto', fontFamily: 'monospace', fontSize: '13px', color: colors.mediumGrey }}>{j.type}</span>
+          </div>
+          <div style={{ backgroundColor: '#F8F9FB', borderRadius: '10px', padding: '14px 16px' }}>
+            <div style={{ fontSize: '11px', color: colors.mediumGrey, textTransform: 'uppercase', letterSpacing: '0.04em', fontWeight: '700', marginBottom: '4px' }}>Reported issue</div>
+            <div style={{ fontSize: '14px', color: colors.darkGrey, lineHeight: 1.5 }}>{j.issue}</div>
+          </div>
+          <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr 1fr', gap: '16px' }}>
+            {field('Vehicle', j.vehicle)}
+            {field('Registration', j.reg)}
+            {field('Odometer', j.mileage)}
+            {field('Workshop', j.workshop)}
+            {field('Requested by', j.requestedBy)}
+            {field('Estimated cost', <span style={{ color: colors.primary }}>{naira(j.cost)}</span>)}
+            {field('Date reported (time in)', j.date)}
+            {field('Expected time out', expectedOut)}
+            {field('Turnaround', `${outDays} day${outDays === 1 ? '' : 's'} (est.)`)}
+          </div>
+          <div style={{ display: 'flex', gap: '10px', justifyContent: 'flex-end', borderTop: `1px solid ${colors.lightGrey}`, paddingTop: '16px' }}>
+            <Button variant="secondary" icon={Send} onClick={emailReport}>Email report</Button>
+            <Button onClick={() => setSelectedJob(null)}>Close</Button>
+          </div>
+        </div>
+      </Modal>
+    );
+  };
+
+  // INVOICE DETAIL MODAL
+  const InvoiceModal = () => {
+    if (!selectedInvoice) return null;
+    const iv = selectedInvoice;
+    const naira = n => '₦' + Math.round(n).toLocaleString();
+    const meta = { paid: { label: 'Paid', bg: '#D4EDDA', fg: '#155724' }, pending: { label: 'Pending', bg: '#FFF3CD', fg: '#856404' }, overdue: { label: 'Overdue', bg: '#F8D7DA', fg: '#721C24' } };
+    const subtotal = iv.amount / 1.075;
+    const vat = iv.amount - subtotal;
+    const emailInvoice = () => sendViaMailgun({
+      to: mailgun.notify || 'accounts@client.ng',
+      subject: `Invoice ${iv.id} from C&I Leasing Plc — ${naira(iv.amount)}`,
+      text: `INVOICE ${iv.id}\nC&I Leasing Plc\n\nBill to:   ${iv.client}\nType:      ${iv.type}\nIssued:    ${iv.issued}\nDue:       ${iv.due}\n\nSubtotal:  ${naira(subtotal)}\nVAT (7.5%):${naira(vat)}\nTotal:     ${naira(iv.amount)}\n\nStatus:    ${meta[iv.status].label}\nPayment:   ${iv.method}\n\nThank you for your business.\n— C&I Leasing Plc`,
+    });
+    return (
+      <Modal isOpen={!!selectedInvoice} onClose={() => setSelectedInvoice(null)} title={`Invoice ${iv.id}`} width="620px">
+        <div style={{ display: 'flex', flexDirection: 'column', gap: '18px' }}>
+          <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start' }}>
+            <div>
+              <div style={{ fontSize: '18px', fontWeight: '800', color: colors.primary }}>C&I Leasing Plc</div>
+              <div style={{ fontSize: '12px', color: colors.mediumGrey }}>14 Adeola Odeku Street, Victoria Island, Lagos</div>
+            </div>
+            <span style={{ padding: '5px 12px', borderRadius: '20px', fontSize: '12px', fontWeight: '700', backgroundColor: meta[iv.status].bg, color: meta[iv.status].fg }}>{meta[iv.status].label}</span>
+          </div>
+          <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr 1fr', gap: '14px' }}>
+            {[['Bill to', iv.client], ['Type', iv.type], ['Invoice no.', iv.id], ['Issued', iv.issued], ['Due', iv.due], ['Payment method', iv.method]].map(([k, v]) => (
+              <div key={k}><div style={{ fontSize: '11px', color: colors.mediumGrey, textTransform: 'uppercase', letterSpacing: '0.04em', fontWeight: '700' }}>{k}</div><div style={{ fontSize: '14px', color: colors.darkGrey, marginTop: '2px', fontWeight: '600' }}>{v}</div></div>
+            ))}
+          </div>
+          <div style={{ border: `1px solid ${colors.lightGrey}`, borderRadius: '10px', overflow: 'hidden' }}>
+            <div style={{ display: 'flex', justifyContent: 'space-between', padding: '10px 14px', borderBottom: `1px solid ${colors.lightGrey}`, fontSize: '13px' }}><span style={{ color: colors.darkGrey }}>{iv.type} services</span><span style={{ fontWeight: '600' }}>{naira(subtotal)}</span></div>
+            <div style={{ display: 'flex', justifyContent: 'space-between', padding: '10px 14px', borderBottom: `1px solid ${colors.lightGrey}`, fontSize: '13px' }}><span style={{ color: colors.mediumGrey }}>VAT (7.5%)</span><span>{naira(vat)}</span></div>
+            <div style={{ display: 'flex', justifyContent: 'space-between', padding: '12px 14px', backgroundColor: `${colors.primary}0d` }}><span style={{ fontWeight: '800', color: colors.darkGrey }}>Total</span><span style={{ fontWeight: '800', color: colors.primary, fontSize: '16px' }}>{naira(iv.amount)}</span></div>
+          </div>
+          <div style={{ display: 'flex', gap: '10px', justifyContent: 'flex-end', alignItems: 'center', borderTop: `1px solid ${colors.lightGrey}`, paddingTop: '16px' }}>
+            <span style={{ fontSize: '12px', color: colors.mediumGrey, marginRight: 'auto', display: 'inline-flex', alignItems: 'center', gap: '5px' }}>{iv.sage ? <><CheckCircle size={14} color={colors.success} /> Synced to Sage X3</> : <><Clock size={14} /> Sage sync queued</>}</span>
+            <Button variant="secondary" icon={Send} onClick={emailInvoice}>Send invoice</Button>
+            <Button onClick={() => setSelectedInvoice(null)}>Close</Button>
+          </div>
+        </div>
+      </Modal>
     );
   };
 
@@ -4976,6 +5380,11 @@ const CNIFleetManagementUI = () => {
       {/* Modals */}
       {SuccessModal()}
       {AddVehicleModal()}
+      {VehicleDocsModal()}
+      {EditVehicleModal()}
+      {ExpiryNoticeModal()}
+      {MaintenanceJobModal()}
+      {InvoiceModal()}
     </div>
   );
 };
