@@ -9,6 +9,11 @@ import { MapContainer, TileLayer, Marker, Popup, useMap } from 'react-leaflet';
 import L from 'leaflet';
 import 'leaflet/dist/leaflet.css';
 
+// Paystack PUBLIC test key (client-side, safe to embed — never put a secret sk_ key here).
+// Replace with your own pk_test_ key from the Paystack dashboard to enable the live test
+// popup; until then a simulated test payment keeps the booking flow demonstrable.
+const PAYSTACK_PUBLIC_KEY = 'pk_test_b7cb36fcd4f676cacb81d2793b6cd804ec6490d0';
+
 // Fix for default marker icons in Leaflet with webpack/vite
 delete L.Icon.Default.prototype._getIconUrl;
 L.Icon.Default.mergeOptions({
@@ -107,6 +112,7 @@ const CNIFleetManagementUI = () => {
     notes: '',
   });
   const [bookingReference, setBookingReference] = useState('');
+  const [showcaseError, setShowcaseError] = useState('');
 
   // Enhanced booking form state
   const [bookingForm, setBookingForm] = useState({
@@ -126,6 +132,73 @@ const CNIFleetManagementUI = () => {
     discount: 0,
     totalAmount: 0
   });
+
+  // Maintenance module state
+  const [maintFilter, setMaintFilter] = useState('all');
+  const [maintenanceRecords, setMaintenanceRecords] = useState([
+    { id: 'MNT-3012', vehicle: 'Toyota Camry 2023', reg: 'LSD-234CY', type: 'Preventive', issue: 'Scheduled 10,000km service — oil, filters, brake check', workshop: 'AutoCare Lekki', cost: 68000, requestedBy: 'John Obi (Driver)', date: '2026-01-12', status: 'pending', priority: 'medium', mileage: '10,120 km' },
+    { id: 'MNT-3011', vehicle: 'Mercedes E-Class 2024', reg: 'ABJ-881KL', type: 'Corrective', issue: 'AC not cooling — suspected compressor', workshop: 'Benz Specialist VI', cost: 240000, requestedBy: 'Fleet Officer', date: '2026-01-10', status: 'awaiting-parts', priority: 'high', mileage: '18,300 km' },
+    { id: 'MNT-3010', vehicle: 'Honda Accord 2022', reg: 'KJA-556AB', type: 'Corrective', issue: 'Front brake pads worn — grinding noise', workshop: 'AutoCare Lekki', cost: 45000, requestedBy: 'Musa Bello (Driver)', date: '2026-01-09', status: 'in-progress', priority: 'high', mileage: '42,900 km' },
+    { id: 'MNT-3009', vehicle: 'BMW 5 Series 2024', reg: 'LND-120XY', type: 'Preventive', issue: 'Tyre rotation and wheel alignment', workshop: 'TrackFit Ikeja', cost: 32000, requestedBy: 'Fleet Officer', date: '2026-01-08', status: 'approved', priority: 'low', mileage: '9,400 km' },
+    { id: 'MNT-3008', vehicle: 'Toyota Hiace Bus', reg: 'GGE-777BN', type: 'Corrective', issue: 'Replace faulty alternator', workshop: 'BusWorks Apapa', cost: 95000, requestedBy: 'Ops Team', date: '2026-01-05', status: 'completed', priority: 'high', mileage: '88,200 km' },
+    { id: 'MNT-3007', vehicle: 'Honda Accord 2022', reg: 'KJA-556AB', type: 'Preventive', issue: 'Full 40,000km service', workshop: 'AutoCare Lekki', cost: 120000, requestedBy: 'Fleet Officer', date: '2025-12-28', status: 'completed', priority: 'medium', mileage: '40,050 km' },
+  ]);
+  const setMaintStatus = (id, status) => setMaintenanceRecords(rs => rs.map(r => r.id === id ? { ...r, status } : r));
+  const addMaintRequest = () => setMaintenanceRecords(rs => [{
+    id: 'MNT-' + (3013 + rs.filter(r => r.id.startsWith('MNT-30')).length),
+    vehicle: 'Toyota Camry 2023', reg: 'LSD-234CY', type: 'Corrective',
+    issue: 'New request — check engine light on', workshop: 'Unassigned', cost: 0,
+    requestedBy: 'Fleet Officer', date: '2026-01-15', status: 'pending', priority: 'medium', mileage: '10,300 km',
+  }, ...rs]);
+
+  // Clients & Contracts module state
+  const [clientFilter, setClientFilter] = useState('all');
+  const [selectedClient, setSelectedClient] = useState(null);
+  const [clientsData, setClientsData] = useState([
+    { id: 'CL-101', name: 'Acme Corporation', segment: 'Corporate', contact: 'Mr. Adeyemi', phone: '0803-123-4567', email: 'adeyemi@acmecorp.ng', vehicles: 8, contractType: 'Monthly retainer', monthly: 1250000, start: '2021-03-01', end: '2026-03-01', status: 'active', outstanding: 0, since: 2021 },
+    { id: 'CL-102', name: 'Zenith Bank Plc', segment: 'Corporate', contact: 'Mrs. Okafor', phone: '0805-777-1200', email: 'fleet@zenithbank.ng', vehicles: 15, contractType: 'Monthly retainer', monthly: 2800000, start: '2019-06-01', end: '2026-06-01', status: 'active', outstanding: 420000, since: 2019 },
+    { id: 'CL-103', name: 'Dangote Group', segment: 'VIP', contact: 'Mr. Sani', phone: '0807-500-9000', email: 'logistics@dangote.com', vehicles: 22, contractType: 'Monthly retainer', monthly: 4100000, start: '2018-01-15', end: '2026-02-01', status: 'renewal-due', outstanding: 0, since: 2018 },
+    { id: 'CL-104', name: 'Chief B. Adeyi', segment: 'VIP', contact: 'Chief B. Adeyi', phone: '0802-311-4455', email: 'b.adeyi@gmail.com', vehicles: 2, contractType: 'Monthly retainer', monthly: 480000, start: '2022-09-01', end: '2026-09-01', status: 'active', outstanding: 0, since: 2022 },
+    { id: 'CL-105', name: 'GreenTech Ltd', segment: 'Corporate', contact: 'Ms. Bello', phone: '0809-220-7788', email: 'ops@greentech.ng', vehicles: 4, contractType: 'Monthly retainer', monthly: 620000, start: '2023-11-01', end: '2026-01-31', status: 'renewal-due', outstanding: 95000, since: 2023 },
+    { id: 'CL-106', name: 'Mr. Tunde Bakare', segment: 'Individual', contact: 'Mr. Tunde Bakare', phone: '0812-908-1122', email: 'tunde.bakare@gmail.com', vehicles: 0, contractType: 'Walk-in', monthly: 0, start: '—', end: '—', status: 'prospect', outstanding: 0, since: 2026 },
+  ]);
+  const renewClient = (id) => setClientsData(cs => cs.map(c => c.id === id ? { ...c, status: 'active', end: '2027-01-31' } : c));
+
+  // Invoicing & Payments module state
+  const [invoiceFilter, setInvoiceFilter] = useState('all');
+  const [invoicesData, setInvoicesData] = useState([
+    { id: 'INV-9012', client: 'Acme Corporation', type: 'Contract', amount: 1250000, issued: '2026-01-01', due: '2026-01-15', status: 'paid', method: 'Wema Cash Connect', sage: true },
+    { id: 'INV-9011', client: 'Dangote Group', type: 'Contract', amount: 4100000, issued: '2026-01-01', due: '2026-01-15', status: 'paid', method: 'GTBank', sage: true },
+    { id: 'INV-9010', client: 'Chief B. Adeyi', type: 'Contract', amount: 480000, issued: '2026-01-01', due: '2026-01-15', status: 'paid', method: 'Paystack', sage: true },
+    { id: 'INV-9009', client: 'Zenith Bank Plc', type: 'Contract', amount: 420000, issued: '2026-01-01', due: '2026-01-10', status: 'overdue', method: '—', sage: true },
+    { id: 'INV-9008', client: 'GreenTech Ltd', type: 'Contract', amount: 95000, issued: '2026-01-01', due: '2026-01-12', status: 'overdue', method: '—', sage: true },
+    { id: 'INV-9007', client: 'Acme Corporation', type: 'Reservation', amount: 147813, issued: '2026-01-15', due: '2026-01-20', status: 'pending', method: '—', sage: false },
+    { id: 'INV-9006', client: 'Mr. Tunde Bakare', type: 'Reservation', amount: 85000, issued: '2026-01-14', due: '2026-01-14', status: 'paid', method: 'Flutterwave', sage: true },
+  ]);
+  const recordPayment = (id) => setInvoicesData(is => is.map(i => i.id === id ? { ...i, status: 'paid', method: 'Manual (recorded)', sage: true } : i));
+
+  // Settings module state
+  const [settingsTab, setSettingsTab] = useState('integrations');
+  const [integrations, setIntegrations] = useState([
+    { key: 'sage', name: 'Sage X3 ERP', desc: 'Financial system of record — invoices, payments, purchase orders', connected: true },
+    { key: 'ganoli', name: 'Ganoli GPS', desc: 'Live vehicle tracking, mileage & fuel telemetry', connected: true },
+    { key: 'wema', name: 'Wema Bank (Cash Connect)', desc: 'Virtual accounts & instant payment confirmation', connected: true },
+    { key: 'vfd', name: 'VFD Microfinance Bank', desc: 'Collections, USSD & bank transfers', connected: true },
+    { key: 'gtbank', name: 'GTBank', desc: 'Card payment gateway', connected: false },
+    { key: 'paystack', name: 'Paystack', desc: 'Cards, bank transfer, USSD', connected: true },
+    { key: 'flutterwave', name: 'Flutterwave', desc: 'Multi-channel payments', connected: false },
+  ]);
+  const toggleIntegration = (key) => setIntegrations(xs => xs.map(x => x.key === key ? { ...x, connected: !x.connected } : x));
+  const [notifPrefs, setNotifPrefs] = useState({
+    'Booking confirmed': { email: true, sms: true },
+    'Payment received': { email: true, sms: false },
+    'Maintenance due': { email: true, sms: true },
+    'Document expiry': { email: true, sms: true },
+    'Contract renewal': { email: true, sms: false },
+  });
+  const toggleNotif = (evt, chan) => setNotifPrefs(p => ({ ...p, [evt]: { ...p[evt], [chan]: !p[evt][chan] } }));
+  const [companyForm, setCompanyForm] = useState({ name: 'CNI Fleet Management', rc: 'RC-482013', address: '14 Adeola Odeku Street, Victoria Island, Lagos', email: 'ops@cnifleet.ng', phone: '0700-264-3538' });
+  const [companySaved, setCompanySaved] = useState(false);
 
   // Color palette
   const colors = {
@@ -683,6 +756,26 @@ const CNIFleetManagementUI = () => {
     return { days, baseAmount, driverFee, insuranceFee, fuelFee, gpsFee, subtotal, vat, total: subtotal + vat };
   };
 
+  // Paystack test-mode payment. Opens the live inline popup when a real pk_test_ key is set;
+  // otherwise falls back to a simulated success so the booking flow stays demonstrable.
+  const payWithPaystack = ({ email, amountNaira, onSuccess }) => {
+    const keyed = PAYSTACK_PUBLIC_KEY && PAYSTACK_PUBLIC_KEY.startsWith('pk_test_') && !PAYSTACK_PUBLIC_KEY.includes('REPLACE');
+    if (keyed && typeof window !== 'undefined' && window.PaystackPop) {
+      const handler = window.PaystackPop.setup({
+        key: PAYSTACK_PUBLIC_KEY,
+        email: email || 'customer@example.com',
+        amount: Math.round(amountNaira * 100), // Paystack expects kobo
+        currency: 'NGN',
+        ref: 'CNI-' + Date.now(),
+        onClose: () => {},
+        callback: (resp) => onSuccess(resp.reference),
+      });
+      handler.openIframe();
+    } else {
+      onSuccess('CNI-TEST-' + Date.now().toString().slice(-8));
+    }
+  };
+
   // Filter bookings by status
   const filteredBookings = filterStatus === 'all'
     ? allBookings
@@ -1075,8 +1168,8 @@ const CNIFleetManagementUI = () => {
   const BookingsListView = () => (
     <div style={{ padding: '32px' }}>
       {/* Actions Bar */}
-      <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '28px' }}>
-        <div style={{ display: 'flex', gap: '12px', flex: 1 }}>
+      <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '28px', flexWrap: 'wrap', gap: '16px' }}>
+        <div style={{ display: 'flex', gap: '12px', flex: '1 1 320px', flexWrap: 'wrap' }}>
           <div style={{
             display: 'flex',
             alignItems: 'center',
@@ -1085,7 +1178,9 @@ const CNIFleetManagementUI = () => {
             borderRadius: '8px',
             padding: '10px 16px',
             gap: '10px',
-            width: '400px',
+            flex: '1 1 240px',
+            minWidth: '200px',
+            maxWidth: '400px',
           }}>
             <Search size={18} color={colors.mediumGrey} />
             <input
@@ -1101,7 +1196,7 @@ const CNIFleetManagementUI = () => {
           </div>
 
           {/* Status Filter Tabs */}
-          <div style={{ display: 'flex', gap: '8px', backgroundColor: colors.white, padding: '6px', borderRadius: '8px', border: `1px solid ${colors.lightGrey}` }}>
+          <div style={{ display: 'flex', gap: '8px', backgroundColor: colors.white, padding: '6px', borderRadius: '8px', border: `1px solid ${colors.lightGrey}`, flexWrap: 'wrap' }}>
             {['all', 'pending', 'confirmed', 'active', 'completed', 'cancelled'].map(status => (
               <button
                 key={status}
@@ -1146,10 +1241,10 @@ const CNIFleetManagementUI = () => {
         backgroundColor: colors.white,
         borderRadius: '12px',
         border: `1px solid ${colors.lightGrey}`,
-        overflow: 'hidden',
+        overflowX: 'auto',
         boxShadow: '0 1px 3px rgba(0,0,0,0.05)',
       }}>
-        <table style={{ width: '100%', borderCollapse: 'collapse' }}>
+        <table style={{ width: '100%', minWidth: '820px', borderCollapse: 'collapse' }}>
           <thead>
             <tr style={{ backgroundColor: '#F8F9FA', borderBottom: `2px solid ${colors.lightGrey}` }}>
               <th style={{ padding: '16px 20px', textAlign: 'left', fontSize: '13px', fontWeight: '700', color: colors.darkGrey, textTransform: 'uppercase' }}>Booking ID</th>
@@ -3812,11 +3907,28 @@ const CNIFleetManagementUI = () => {
                 </div>
               </div>
 
+              {showcaseError && (
+                <div style={{ display: 'flex', alignItems: 'center', gap: '8px', padding: '10px 14px', marginBottom: '12px', backgroundColor: '#F8D7DA', color: '#721C24', borderRadius: '8px', fontSize: '13px', fontWeight: '600' }}>
+                  <AlertCircle size={16} /> {showcaseError}
+                </div>
+              )}
               <button
-                onClick={() => { setBookingReference(`CNI-${Date.now().toString().slice(-8)}`); setShowcaseView('confirmation'); }}
-                disabled={!clientBooking.customerName || !clientBooking.customerEmail || !clientBooking.customerPhone || !clientBooking.pickupLocation}
-                style={{ width: '100%', padding: '16px', backgroundColor: colors.primary, color: colors.white, border: 'none', borderRadius: '10px', fontSize: '16px', fontWeight: '700', cursor: 'pointer', opacity: (!clientBooking.customerName || !clientBooking.customerEmail || !clientBooking.customerPhone || !clientBooking.pickupLocation) ? 0.7 : 1 }}>
-                Confirm Booking
+                onClick={() => {
+                  const missing = [];
+                  if (!clientBooking.customerName) missing.push('full name');
+                  if (!clientBooking.customerEmail) missing.push('email');
+                  if (!clientBooking.customerPhone) missing.push('phone number');
+                  if (!clientBooking.pickupLocation) missing.push('pickup location');
+                  if (missing.length) { setShowcaseError('Please provide your ' + missing.join(', ') + ' to confirm.'); return; }
+                  setShowcaseError('');
+                  payWithPaystack({
+                    email: clientBooking.customerEmail,
+                    amountNaira: bookingTotals.total,
+                    onSuccess: (ref) => { setBookingReference(ref); setShowcaseView('confirmation'); },
+                  });
+                }}
+                style={{ width: '100%', padding: '16px', backgroundColor: colors.primary, color: colors.white, border: 'none', borderRadius: '10px', fontSize: '16px', fontWeight: '700', cursor: 'pointer', display: 'flex', alignItems: 'center', justifyContent: 'center', gap: '10px' }}>
+                <CreditCard size={18} /> Pay {bookingTotals.total ? '₦' + bookingTotals.total.toLocaleString() : ''} with Paystack
               </button>
             </div>
           </div>
@@ -3949,14 +4061,15 @@ const CNIFleetManagementUI = () => {
               </div>
             </div>
 
-            <div style={{ textAlign: 'left', padding: '20px', backgroundColor: '#FFF3CD', borderRadius: '12px', marginBottom: '24px' }}>
-              <h4 style={{ fontSize: '14px', fontWeight: '600', color: '#856404', margin: '0 0 8px 0' }}>Payment Instructions</h4>
-              <p style={{ fontSize: '13px', color: '#856404', margin: 0 }}>
-                Please transfer ₦{bookingTotals.total?.toLocaleString()} to:<br />
-                <strong>C&I Leasing PLC</strong><br />
-                Wema Bank - 0123456789<br />
-                Use reference: {bookingReference}
-              </p>
+            <div style={{ textAlign: 'left', padding: '20px', backgroundColor: '#D4EDDA', borderRadius: '12px', marginBottom: '24px', display: 'flex', gap: '12px', alignItems: 'flex-start' }}>
+              <CheckCircle size={22} color="#155724" style={{ flexShrink: 0, marginTop: '2px' }} />
+              <div>
+                <h4 style={{ fontSize: '14px', fontWeight: '700', color: '#155724', margin: '0 0 4px 0' }}>Payment received via Paystack</h4>
+                <p style={{ fontSize: '13px', color: '#155724', margin: 0 }}>
+                  ₦{bookingTotals.total?.toLocaleString()} paid to <strong>C&I Leasing PLC</strong> · reference {bookingReference}.<br />
+                  A receipt and invoice have been emailed to {clientBooking.customerEmail || 'you'}.
+                </p>
+              </div>
             </div>
 
             <div style={{ display: 'flex', gap: '12px', justifyContent: 'center' }}>
@@ -4178,6 +4291,616 @@ const CNIFleetManagementUI = () => {
     );
   };
 
+  // MAINTENANCE VIEW
+  const MaintenanceView = () => {
+    const meta = {
+      pending: { label: 'Awaiting Approval', bg: '#FFF3CD', fg: '#856404' },
+      approved: { label: 'Approved', bg: '#CCE5FF', fg: '#004085' },
+      'in-progress': { label: 'In Workshop', bg: '#D1ECF1', fg: '#0C5460' },
+      'awaiting-parts': { label: 'Awaiting Parts', bg: '#E2D9F3', fg: '#4B2E83' },
+      completed: { label: 'Completed', bg: '#D4EDDA', fg: '#155724' },
+    };
+    const prio = { high: colors.danger, medium: colors.warning, low: colors.mediumGrey };
+    const filters = ['all', 'pending', 'approved', 'in-progress', 'awaiting-parts', 'completed'];
+    const rows = maintenanceRecords.filter(r => maintFilter === 'all' || r.status === maintFilter);
+    const openJobs = maintenanceRecords.filter(r => r.status !== 'completed').length;
+    const pendingCount = maintenanceRecords.filter(r => r.status === 'pending').length;
+    const inWorkshop = maintenanceRecords.filter(r => r.status === 'in-progress' || r.status === 'awaiting-parts').length;
+    const spend = maintenanceRecords.filter(r => r.status === 'completed').reduce((s, r) => s + r.cost, 0);
+    const naira = n => '₦' + n.toLocaleString();
+    const stats = [
+      { label: 'Open jobs', value: openJobs, color: colors.primary, icon: Wrench },
+      { label: 'Awaiting approval', value: pendingCount, color: colors.warning, icon: Clock },
+      { label: 'In workshop', value: inWorkshop, color: colors.info, icon: Activity },
+      { label: 'Completed spend', value: naira(spend), color: colors.success, icon: DollarSign },
+    ];
+    const nextAction = r => {
+      if (r.status === 'pending') return { label: 'Approve', variant: 'success', to: 'approved' };
+      if (r.status === 'approved') return { label: 'Start work', variant: 'primary', to: 'in-progress' };
+      if (r.status === 'in-progress' || r.status === 'awaiting-parts') return { label: 'Mark complete', variant: 'primary', to: 'completed' };
+      return null;
+    };
+
+    return (
+      <div style={{ padding: '32px' }}>
+        <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '24px', flexWrap: 'wrap', gap: '12px' }}>
+          <div>
+            <h2 style={{ margin: 0, fontSize: '22px', fontWeight: '700', color: colors.darkGrey }}>Maintenance & Workshop</h2>
+            <p style={{ margin: '4px 0 0', color: colors.mediumGrey, fontSize: '14px' }}>Requests, approvals, workshop jobs and service history</p>
+          </div>
+          <Button icon={Plus} onClick={addMaintRequest}>New Request</Button>
+        </div>
+
+        <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(200px, 1fr))', gap: '16px', marginBottom: '24px' }}>
+          {stats.map(s => (
+            <div key={s.label} style={{ backgroundColor: colors.white, borderRadius: '12px', padding: '20px', boxShadow: '0 2px 8px rgba(0,0,0,0.06)', display: 'flex', alignItems: 'center', gap: '14px' }}>
+              <div style={{ width: '44px', height: '44px', borderRadius: '10px', backgroundColor: `${s.color}18`, display: 'flex', alignItems: 'center', justifyContent: 'center', flexShrink: 0 }}>
+                <s.icon size={22} color={s.color} />
+              </div>
+              <div>
+                <div style={{ fontSize: '22px', fontWeight: '700', color: colors.darkGrey }}>{s.value}</div>
+                <div style={{ fontSize: '13px', color: colors.mediumGrey }}>{s.label}</div>
+              </div>
+            </div>
+          ))}
+        </div>
+
+        <div style={{ display: 'flex', gap: '8px', marginBottom: '16px', flexWrap: 'wrap' }}>
+          {filters.map(f => (
+            <button key={f} onClick={() => setMaintFilter(f)} style={{
+              padding: '8px 16px', borderRadius: '20px', fontSize: '13px', fontWeight: '600', cursor: 'pointer',
+              border: `1px solid ${maintFilter === f ? colors.primary : colors.lightGrey}`,
+              backgroundColor: maintFilter === f ? colors.primary : colors.white,
+              color: maintFilter === f ? colors.white : colors.mediumGrey, textTransform: 'capitalize',
+            }}>{f === 'all' ? 'All jobs' : (meta[f]?.label || f)}</button>
+          ))}
+        </div>
+
+        <div style={{ backgroundColor: colors.white, borderRadius: '12px', boxShadow: '0 2px 8px rgba(0,0,0,0.06)', overflow: 'hidden' }}>
+          <div style={{ overflowX: 'auto' }}>
+            <table style={{ width: '100%', borderCollapse: 'collapse', minWidth: '900px' }}>
+              <thead>
+                <tr style={{ backgroundColor: '#F8F9FB', textAlign: 'left' }}>
+                  {['Job', 'Vehicle', 'Type', 'Workshop', 'Cost', 'Status', 'Action'].map(h => (
+                    <th key={h} style={{ padding: '14px 16px', fontSize: '12px', fontWeight: '700', color: colors.mediumGrey, textTransform: 'uppercase', letterSpacing: '0.04em', borderBottom: `1px solid ${colors.lightGrey}` }}>{h}</th>
+                  ))}
+                </tr>
+              </thead>
+              <tbody>
+                {rows.map(r => {
+                  const act = nextAction(r);
+                  return (
+                    <tr key={r.id} style={{ borderBottom: `1px solid ${colors.lightGrey}` }}>
+                      <td style={{ padding: '14px 16px' }}>
+                        <div style={{ fontWeight: '700', color: colors.darkGrey, fontSize: '14px' }}>{r.id}</div>
+                        <div style={{ fontSize: '12px', color: colors.mediumGrey, maxWidth: '260px' }}>{r.issue}</div>
+                        <div style={{ display: 'inline-flex', alignItems: 'center', gap: '5px', marginTop: '4px', fontSize: '11px', fontWeight: '700', color: prio[r.priority] }}>
+                          <Circle size={8} fill={prio[r.priority]} color={prio[r.priority]} /> {r.priority.toUpperCase()} PRIORITY
+                        </div>
+                      </td>
+                      <td style={{ padding: '14px 16px', fontSize: '13px' }}>
+                        <div style={{ fontWeight: '600', color: colors.darkGrey }}>{r.vehicle}</div>
+                        <div style={{ color: colors.mediumGrey }}>{r.reg} · {r.mileage}</div>
+                      </td>
+                      <td style={{ padding: '14px 16px', fontSize: '13px', color: colors.darkGrey }}>{r.type}</td>
+                      <td style={{ padding: '14px 16px', fontSize: '13px', color: colors.darkGrey }}>{r.workshop}</td>
+                      <td style={{ padding: '14px 16px', fontSize: '13px', fontWeight: '700', color: colors.darkGrey, whiteSpace: 'nowrap' }}>{r.cost ? naira(r.cost) : '—'}</td>
+                      <td style={{ padding: '14px 16px' }}>
+                        <span style={{ padding: '5px 12px', borderRadius: '20px', fontSize: '12px', fontWeight: '700', backgroundColor: meta[r.status].bg, color: meta[r.status].fg, whiteSpace: 'nowrap' }}>{meta[r.status].label}</span>
+                      </td>
+                      <td style={{ padding: '14px 16px' }}>
+                        {act ? (
+                          <Button size="small" variant={act.variant} onClick={() => setMaintStatus(r.id, act.to)}>{act.label}</Button>
+                        ) : (
+                          <span style={{ display: 'inline-flex', alignItems: 'center', gap: '6px', color: colors.success, fontSize: '13px', fontWeight: '600' }}><CheckCircle size={16} /> Done</span>
+                        )}
+                      </td>
+                    </tr>
+                  );
+                })}
+                {rows.length === 0 && (
+                  <tr><td colSpan={7} style={{ padding: '48px', textAlign: 'center', color: colors.mediumGrey }}>No jobs in this category.</td></tr>
+                )}
+              </tbody>
+            </table>
+          </div>
+        </div>
+      </div>
+    );
+  };
+
+  // CLIENTS & CONTRACTS VIEW
+  const ClientsView = () => {
+    const cmeta = {
+      active: { label: 'Active', bg: '#D4EDDA', fg: '#155724' },
+      'renewal-due': { label: 'Renewal Due', bg: '#FFF3CD', fg: '#856404' },
+      expired: { label: 'Expired', bg: '#F8D7DA', fg: '#721C24' },
+      prospect: { label: 'Prospect', bg: '#E2E3E5', fg: '#383D41' },
+    };
+    const segColor = { Corporate: colors.primary, VIP: '#8E44AD', Individual: colors.accent };
+    const naira = n => '₦' + n.toLocaleString();
+    const filters = ['all', 'Corporate', 'VIP', 'Individual', 'renewal-due'];
+    const rows = clientsData.filter(c =>
+      clientFilter === 'all' ? true : clientFilter === 'renewal-due' ? c.status === 'renewal-due' : c.segment === clientFilter);
+    const activeContracts = clientsData.filter(c => c.status === 'active' || c.status === 'renewal-due').length;
+    const vehiclesOnContract = clientsData.reduce((s, c) => s + c.vehicles, 0);
+    const outstanding = clientsData.reduce((s, c) => s + c.outstanding, 0);
+    const stats = [
+      { label: 'Total clients', value: clientsData.length, color: colors.primary, icon: Users },
+      { label: 'Active contracts', value: activeContracts, color: colors.success, icon: FileCheck },
+      { label: 'Vehicles on contract', value: vehiclesOnContract, color: colors.info, icon: Car },
+      { label: 'Outstanding', value: naira(outstanding), color: outstanding ? colors.danger : colors.success, icon: DollarSign },
+    ];
+
+    return (
+      <div style={{ padding: '32px' }}>
+        <div style={{ marginBottom: '24px' }}>
+          <h2 style={{ margin: 0, fontSize: '22px', fontWeight: '700', color: colors.darkGrey }}>Clients & Contracts</h2>
+          <p style={{ margin: '4px 0 0', color: colors.mediumGrey, fontSize: '14px' }}>Customer database, contract terms and renewal tracking</p>
+        </div>
+
+        <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(200px, 1fr))', gap: '16px', marginBottom: '24px' }}>
+          {stats.map(s => (
+            <div key={s.label} style={{ backgroundColor: colors.white, borderRadius: '12px', padding: '20px', boxShadow: '0 2px 8px rgba(0,0,0,0.06)', display: 'flex', alignItems: 'center', gap: '14px' }}>
+              <div style={{ width: '44px', height: '44px', borderRadius: '10px', backgroundColor: `${s.color}18`, display: 'flex', alignItems: 'center', justifyContent: 'center', flexShrink: 0 }}>
+                <s.icon size={22} color={s.color} />
+              </div>
+              <div>
+                <div style={{ fontSize: '22px', fontWeight: '700', color: colors.darkGrey }}>{s.value}</div>
+                <div style={{ fontSize: '13px', color: colors.mediumGrey }}>{s.label}</div>
+              </div>
+            </div>
+          ))}
+        </div>
+
+        <div style={{ display: 'flex', gap: '8px', marginBottom: '16px', flexWrap: 'wrap' }}>
+          {filters.map(f => (
+            <button key={f} onClick={() => setClientFilter(f)} style={{
+              padding: '8px 16px', borderRadius: '20px', fontSize: '13px', fontWeight: '600', cursor: 'pointer',
+              border: `1px solid ${clientFilter === f ? colors.primary : colors.lightGrey}`,
+              backgroundColor: clientFilter === f ? colors.primary : colors.white,
+              color: clientFilter === f ? colors.white : colors.mediumGrey,
+            }}>{f === 'all' ? 'All clients' : f === 'renewal-due' ? 'Renewal due' : f}</button>
+          ))}
+        </div>
+
+        <div style={{ backgroundColor: colors.white, borderRadius: '12px', boxShadow: '0 2px 8px rgba(0,0,0,0.06)', overflow: 'hidden' }}>
+          <div style={{ overflowX: 'auto' }}>
+            <table style={{ width: '100%', borderCollapse: 'collapse', minWidth: '860px' }}>
+              <thead>
+                <tr style={{ backgroundColor: '#F8F9FB', textAlign: 'left' }}>
+                  {['Client', 'Segment', 'Vehicles', 'Contract', 'Monthly', 'Status', ''].map((h, i) => (
+                    <th key={i} style={{ padding: '14px 16px', fontSize: '12px', fontWeight: '700', color: colors.mediumGrey, textTransform: 'uppercase', letterSpacing: '0.04em', borderBottom: `1px solid ${colors.lightGrey}` }}>{h}</th>
+                  ))}
+                </tr>
+              </thead>
+              <tbody>
+                {rows.map(c => (
+                  <tr key={c.id} style={{ borderBottom: `1px solid ${colors.lightGrey}` }}>
+                    <td style={{ padding: '14px 16px' }}>
+                      <div style={{ fontWeight: '700', color: colors.darkGrey, fontSize: '14px' }}>{c.name}</div>
+                      <div style={{ fontSize: '12px', color: colors.mediumGrey }}>{c.contact} · since {c.since}</div>
+                    </td>
+                    <td style={{ padding: '14px 16px' }}>
+                      <span style={{ padding: '4px 10px', borderRadius: '6px', fontSize: '12px', fontWeight: '700', backgroundColor: `${segColor[c.segment]}18`, color: segColor[c.segment] }}>{c.segment}</span>
+                    </td>
+                    <td style={{ padding: '14px 16px', fontSize: '14px', fontWeight: '600', color: colors.darkGrey }}>{c.vehicles || '—'}</td>
+                    <td style={{ padding: '14px 16px', fontSize: '13px', color: colors.darkGrey }}>{c.contractType}</td>
+                    <td style={{ padding: '14px 16px', fontSize: '13px', fontWeight: '700', color: colors.darkGrey, whiteSpace: 'nowrap' }}>{c.monthly ? naira(c.monthly) : '—'}</td>
+                    <td style={{ padding: '14px 16px' }}>
+                      <span style={{ padding: '5px 12px', borderRadius: '20px', fontSize: '12px', fontWeight: '700', backgroundColor: cmeta[c.status].bg, color: cmeta[c.status].fg, whiteSpace: 'nowrap' }}>{cmeta[c.status].label}</span>
+                      {c.outstanding > 0 && <div style={{ fontSize: '11px', color: colors.danger, marginTop: '4px', fontWeight: '600' }}>{naira(c.outstanding)} due</div>}
+                    </td>
+                    <td style={{ padding: '14px 16px' }}>
+                      <Button size="small" variant="secondary" icon={Eye} onClick={() => setSelectedClient(c)}>View</Button>
+                    </td>
+                  </tr>
+                ))}
+                {rows.length === 0 && (
+                  <tr><td colSpan={7} style={{ padding: '48px', textAlign: 'center', color: colors.mediumGrey }}>No clients in this category.</td></tr>
+                )}
+              </tbody>
+            </table>
+          </div>
+        </div>
+
+        <Modal isOpen={!!selectedClient} onClose={() => setSelectedClient(null)} title={selectedClient ? selectedClient.name : ''} width="560px">
+          {selectedClient && (
+            <div style={{ display: 'flex', flexDirection: 'column', gap: '18px' }}>
+              <div style={{ display: 'flex', gap: '10px', alignItems: 'center' }}>
+                <span style={{ padding: '4px 10px', borderRadius: '6px', fontSize: '12px', fontWeight: '700', backgroundColor: `${segColor[selectedClient.segment]}18`, color: segColor[selectedClient.segment] }}>{selectedClient.segment}</span>
+                <span style={{ padding: '5px 12px', borderRadius: '20px', fontSize: '12px', fontWeight: '700', backgroundColor: cmeta[selectedClient.status].bg, color: cmeta[selectedClient.status].fg }}>{cmeta[selectedClient.status].label}</span>
+              </div>
+              <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '14px' }}>
+                {[
+                  ['Contact', selectedClient.contact], ['Phone', selectedClient.phone], ['Email', selectedClient.email],
+                  ['Client since', selectedClient.since], ['Vehicles on contract', selectedClient.vehicles || '—'],
+                  ['Contract type', selectedClient.contractType], ['Monthly value', selectedClient.monthly ? naira(selectedClient.monthly) : '—'],
+                  ['Contract start', selectedClient.start], ['Renewal date', selectedClient.end],
+                  ['Outstanding', selectedClient.outstanding ? naira(selectedClient.outstanding) : '₦0'],
+                ].map(([k, v]) => (
+                  <div key={k}>
+                    <div style={{ fontSize: '11px', color: colors.mediumGrey, textTransform: 'uppercase', letterSpacing: '0.04em', fontWeight: '700' }}>{k}</div>
+                    <div style={{ fontSize: '14px', color: colors.darkGrey, marginTop: '2px' }}>{v}</div>
+                  </div>
+                ))}
+              </div>
+              <div style={{ display: 'flex', gap: '10px', justifyContent: 'flex-end', borderTop: `1px solid ${colors.lightGrey}`, paddingTop: '16px' }}>
+                {selectedClient.status === 'renewal-due' && (
+                  <Button variant="success" icon={RefreshCw} onClick={() => { renewClient(selectedClient.id); setSelectedClient(null); }}>Renew contract</Button>
+                )}
+                <Button variant="secondary" onClick={() => setSelectedClient(null)}>Close</Button>
+              </div>
+            </div>
+          )}
+        </Modal>
+      </div>
+    );
+  };
+
+  // INVOICING & PAYMENTS VIEW
+  const InvoicingView = () => {
+    const imeta = {
+      paid: { label: 'Paid', bg: '#D4EDDA', fg: '#155724' },
+      pending: { label: 'Pending', bg: '#FFF3CD', fg: '#856404' },
+      overdue: { label: 'Overdue', bg: '#F8D7DA', fg: '#721C24' },
+    };
+    const naira = n => '₦' + n.toLocaleString();
+    const filters = ['all', 'paid', 'pending', 'overdue', 'Contract', 'Reservation'];
+    const rows = invoicesData.filter(i =>
+      invoiceFilter === 'all' ? true : ['Contract', 'Reservation'].includes(invoiceFilter) ? i.type === invoiceFilter : i.status === invoiceFilter);
+    const totalInvoiced = invoicesData.reduce((s, i) => s + i.amount, 0);
+    const collected = invoicesData.filter(i => i.status === 'paid').reduce((s, i) => s + i.amount, 0);
+    const outstanding = invoicesData.filter(i => i.status !== 'paid').reduce((s, i) => s + i.amount, 0);
+    const overdueCount = invoicesData.filter(i => i.status === 'overdue').length;
+    const stats = [
+      { label: 'Total invoiced', value: naira(totalInvoiced), color: colors.primary, icon: FileText },
+      { label: 'Collected', value: naira(collected), color: colors.success, icon: CheckCircle },
+      { label: 'Outstanding', value: naira(outstanding), color: colors.warning, icon: Clock },
+      { label: 'Overdue invoices', value: overdueCount, color: colors.danger, icon: AlertTriangle },
+    ];
+
+    return (
+      <div style={{ padding: '32px' }}>
+        <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', marginBottom: '24px', flexWrap: 'wrap', gap: '12px' }}>
+          <div>
+            <h2 style={{ margin: 0, fontSize: '22px', fontWeight: '700', color: colors.darkGrey }}>Invoicing & Payments</h2>
+            <p style={{ margin: '4px 0 0', color: colors.mediumGrey, fontSize: '14px' }}>Reservation & contract invoices, payments and Sage X3 sync</p>
+          </div>
+          <div style={{ display: 'inline-flex', alignItems: 'center', gap: '8px', padding: '8px 14px', borderRadius: '8px', backgroundColor: '#D4EDDA', color: '#155724', fontSize: '13px', fontWeight: '700' }}>
+            <RefreshCw size={15} /> Sage X3 — connected
+          </div>
+        </div>
+
+        <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(200px, 1fr))', gap: '16px', marginBottom: '24px' }}>
+          {stats.map(s => (
+            <div key={s.label} style={{ backgroundColor: colors.white, borderRadius: '12px', padding: '20px', boxShadow: '0 2px 8px rgba(0,0,0,0.06)', display: 'flex', alignItems: 'center', gap: '14px' }}>
+              <div style={{ width: '44px', height: '44px', borderRadius: '10px', backgroundColor: `${s.color}18`, display: 'flex', alignItems: 'center', justifyContent: 'center', flexShrink: 0 }}>
+                <s.icon size={22} color={s.color} />
+              </div>
+              <div>
+                <div style={{ fontSize: '20px', fontWeight: '700', color: colors.darkGrey }}>{s.value}</div>
+                <div style={{ fontSize: '13px', color: colors.mediumGrey }}>{s.label}</div>
+              </div>
+            </div>
+          ))}
+        </div>
+
+        <div style={{ display: 'flex', gap: '8px', marginBottom: '16px', flexWrap: 'wrap' }}>
+          {filters.map(f => (
+            <button key={f} onClick={() => setInvoiceFilter(f)} style={{
+              padding: '8px 16px', borderRadius: '20px', fontSize: '13px', fontWeight: '600', cursor: 'pointer',
+              border: `1px solid ${invoiceFilter === f ? colors.primary : colors.lightGrey}`,
+              backgroundColor: invoiceFilter === f ? colors.primary : colors.white,
+              color: invoiceFilter === f ? colors.white : colors.mediumGrey, textTransform: 'capitalize',
+            }}>{f === 'all' ? 'All invoices' : f}</button>
+          ))}
+        </div>
+
+        <div style={{ backgroundColor: colors.white, borderRadius: '12px', boxShadow: '0 2px 8px rgba(0,0,0,0.06)', overflow: 'hidden' }}>
+          <div style={{ overflowX: 'auto' }}>
+            <table style={{ width: '100%', borderCollapse: 'collapse', minWidth: '900px' }}>
+              <thead>
+                <tr style={{ backgroundColor: '#F8F9FB', textAlign: 'left' }}>
+                  {['Invoice', 'Client', 'Type', 'Amount', 'Due', 'Status', 'Sage X3', 'Action'].map(h => (
+                    <th key={h} style={{ padding: '14px 16px', fontSize: '12px', fontWeight: '700', color: colors.mediumGrey, textTransform: 'uppercase', letterSpacing: '0.04em', borderBottom: `1px solid ${colors.lightGrey}` }}>{h}</th>
+                  ))}
+                </tr>
+              </thead>
+              <tbody>
+                {rows.map(i => (
+                  <tr key={i.id} style={{ borderBottom: `1px solid ${colors.lightGrey}` }}>
+                    <td style={{ padding: '14px 16px', fontWeight: '700', color: colors.darkGrey, fontSize: '14px' }}>{i.id}</td>
+                    <td style={{ padding: '14px 16px', fontSize: '13px', color: colors.darkGrey }}>{i.client}</td>
+                    <td style={{ padding: '14px 16px' }}>
+                      <span style={{ padding: '4px 10px', borderRadius: '6px', fontSize: '12px', fontWeight: '700', backgroundColor: i.type === 'Contract' ? `${colors.primary}18` : `${colors.accent}18`, color: i.type === 'Contract' ? colors.primary : colors.accent }}>{i.type}</span>
+                    </td>
+                    <td style={{ padding: '14px 16px', fontSize: '13px', fontWeight: '700', color: colors.darkGrey, whiteSpace: 'nowrap' }}>{naira(i.amount)}</td>
+                    <td style={{ padding: '14px 16px', fontSize: '13px', color: colors.mediumGrey, whiteSpace: 'nowrap' }}>{i.due}</td>
+                    <td style={{ padding: '14px 16px' }}>
+                      <span style={{ padding: '5px 12px', borderRadius: '20px', fontSize: '12px', fontWeight: '700', backgroundColor: imeta[i.status].bg, color: imeta[i.status].fg }}>{imeta[i.status].label}</span>
+                    </td>
+                    <td style={{ padding: '14px 16px' }}>
+                      {i.sage
+                        ? <span style={{ display: 'inline-flex', alignItems: 'center', gap: '5px', color: colors.success, fontSize: '12px', fontWeight: '600' }}><CheckCircle size={14} /> Synced</span>
+                        : <span style={{ display: 'inline-flex', alignItems: 'center', gap: '5px', color: colors.mediumGrey, fontSize: '12px', fontWeight: '600' }}><Clock size={14} /> Queued</span>}
+                    </td>
+                    <td style={{ padding: '14px 16px' }}>
+                      {i.status === 'paid'
+                        ? <span style={{ color: colors.mediumGrey, fontSize: '12px' }}>{i.method}</span>
+                        : <Button size="small" variant="success" icon={CreditCard} onClick={() => recordPayment(i.id)}>Record payment</Button>}
+                    </td>
+                  </tr>
+                ))}
+                {rows.length === 0 && (
+                  <tr><td colSpan={8} style={{ padding: '48px', textAlign: 'center', color: colors.mediumGrey }}>No invoices in this category.</td></tr>
+                )}
+              </tbody>
+            </table>
+          </div>
+        </div>
+      </div>
+    );
+  };
+
+  // REPORTS & ANALYTICS VIEW
+  const ReportsView = () => {
+    const naira = n => '₦' + n.toLocaleString();
+    const nairaM = n => '₦' + (n / 1000000).toFixed(1) + 'M';
+    const trend = [
+      { month: 'Aug', revenue: 7.8, cost: 5.0 }, { month: 'Sep', revenue: 8.4, cost: 5.3 },
+      { month: 'Oct', revenue: 9.1, cost: 5.6 }, { month: 'Nov', revenue: 8.9, cost: 5.4 },
+      { month: 'Dec', revenue: 10.2, cost: 6.1 }, { month: 'Jan', revenue: 11.4, cost: 6.5 },
+    ];
+    const vehicleProfit = [
+      { vehicle: 'Mercedes E-Class 2024', revenue: 3100000, cost: 1050000, util: 88 },
+      { vehicle: 'BMW 5 Series 2024', revenue: 2950000, cost: 680000, util: 79 },
+      { vehicle: 'Toyota Hiace Bus', revenue: 2200000, cost: 1350000, util: 91 },
+      { vehicle: 'Toyota Camry 2023', revenue: 1850000, cost: 620000, util: 82 },
+      { vehicle: 'Honda Accord 2022', revenue: 1420000, cost: 710000, util: 74 },
+      { vehicle: 'Toyota Corolla 2021', revenue: 1100000, cost: 580000, util: 61 },
+    ].map(v => ({ ...v, net: v.revenue - v.cost, margin: Math.round((v.revenue - v.cost) / v.revenue * 100) }))
+      .sort((a, b) => b.net - a.net);
+    const totalRev = vehicleProfit.reduce((s, v) => s + v.revenue, 0);
+    const totalCost = vehicleProfit.reduce((s, v) => s + v.cost, 0);
+    const avgUtil = Math.round(vehicleProfit.reduce((s, v) => s + v.util, 0) / vehicleProfit.length);
+    const maxTrend = Math.max(...trend.map(t => t.revenue));
+    const maxNet = Math.max(...vehicleProfit.map(v => v.net));
+    const kpis = [
+      { label: 'Total revenue', value: nairaM(totalRev), color: colors.primary, icon: DollarSign },
+      { label: 'Operating cost', value: nairaM(totalCost), color: colors.warning, icon: Fuel },
+      { label: 'Net profit', value: nairaM(totalRev - totalCost), color: colors.success, icon: BarChart3 },
+      { label: 'Avg utilisation', value: avgUtil + '%', color: colors.info, icon: Activity },
+    ];
+    const exportCSV = () => {
+      const header = ['Vehicle', 'Revenue', 'Cost', 'Net Profit', 'Margin %', 'Utilisation %'];
+      const body = vehicleProfit.map(v => [v.vehicle, v.revenue, v.cost, v.net, v.margin, v.util]);
+      const csv = [header, ...body].map(r => r.join(',')).join('\n');
+      const url = URL.createObjectURL(new Blob([csv], { type: 'text/csv' }));
+      const a = document.createElement('a');
+      a.href = url; a.download = 'cni-profitability-report.csv'; a.click();
+      URL.revokeObjectURL(url);
+    };
+
+    return (
+      <div style={{ padding: '32px' }}>
+        <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', marginBottom: '24px', flexWrap: 'wrap', gap: '12px' }}>
+          <div>
+            <h2 style={{ margin: 0, fontSize: '22px', fontWeight: '700', color: colors.darkGrey }}>Reports & Analytics</h2>
+            <p style={{ margin: '4px 0 0', color: colors.mediumGrey, fontSize: '14px' }}>Profitability, utilisation and revenue trends — one source of truth</p>
+          </div>
+          <Button icon={Download} variant="secondary" onClick={exportCSV}>Export CSV</Button>
+        </div>
+
+        <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(200px, 1fr))', gap: '16px', marginBottom: '24px' }}>
+          {kpis.map(s => (
+            <div key={s.label} style={{ backgroundColor: colors.white, borderRadius: '12px', padding: '20px', boxShadow: '0 2px 8px rgba(0,0,0,0.06)', display: 'flex', alignItems: 'center', gap: '14px' }}>
+              <div style={{ width: '44px', height: '44px', borderRadius: '10px', backgroundColor: `${s.color}18`, display: 'flex', alignItems: 'center', justifyContent: 'center', flexShrink: 0 }}>
+                <s.icon size={22} color={s.color} />
+              </div>
+              <div>
+                <div style={{ fontSize: '22px', fontWeight: '700', color: colors.darkGrey }}>{s.value}</div>
+                <div style={{ fontSize: '13px', color: colors.mediumGrey }}>{s.label}</div>
+              </div>
+            </div>
+          ))}
+        </div>
+
+        <div style={{ display: 'grid', gridTemplateColumns: '1fr', gap: '20px' }}>
+          {/* Revenue vs cost trend */}
+          <div style={{ backgroundColor: colors.white, borderRadius: '12px', padding: '24px', boxShadow: '0 2px 8px rgba(0,0,0,0.06)' }}>
+            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '20px' }}>
+              <h3 style={{ margin: 0, fontSize: '16px', fontWeight: '700', color: colors.darkGrey }}>Revenue vs. Operating Cost (6 months)</h3>
+              <div style={{ display: 'flex', gap: '16px', fontSize: '12px', color: colors.mediumGrey }}>
+                <span style={{ display: 'inline-flex', alignItems: 'center', gap: '6px' }}><span style={{ width: '12px', height: '12px', borderRadius: '3px', backgroundColor: colors.primary }} /> Revenue</span>
+                <span style={{ display: 'inline-flex', alignItems: 'center', gap: '6px' }}><span style={{ width: '12px', height: '12px', borderRadius: '3px', backgroundColor: colors.lightGrey }} /> Cost</span>
+              </div>
+            </div>
+            <div style={{ display: 'flex', alignItems: 'flex-end', gap: '8px', height: '180px' }}>
+              {trend.map(t => (
+                <div key={t.month} style={{ flex: 1, display: 'flex', flexDirection: 'column', alignItems: 'center', gap: '8px', height: '100%' }}>
+                  <div style={{ flex: 1, display: 'flex', alignItems: 'flex-end', gap: '5px', width: '100%', justifyContent: 'center' }}>
+                    <div title={'₦' + t.revenue + 'M'} style={{ width: '40%', maxWidth: '22px', height: `${t.revenue / maxTrend * 100}%`, backgroundColor: colors.primary, borderRadius: '4px 4px 0 0' }} />
+                    <div title={'₦' + t.cost + 'M'} style={{ width: '40%', maxWidth: '22px', height: `${t.cost / maxTrend * 100}%`, backgroundColor: colors.lightGrey, borderRadius: '4px 4px 0 0' }} />
+                  </div>
+                  <span style={{ fontSize: '12px', color: colors.mediumGrey, fontWeight: '600' }}>{t.month}</span>
+                </div>
+              ))}
+            </div>
+          </div>
+
+          {/* Profitability by vehicle */}
+          <div style={{ backgroundColor: colors.white, borderRadius: '12px', boxShadow: '0 2px 8px rgba(0,0,0,0.06)', overflow: 'hidden' }}>
+            <h3 style={{ margin: 0, padding: '20px 24px', fontSize: '16px', fontWeight: '700', color: colors.darkGrey, borderBottom: `1px solid ${colors.lightGrey}` }}>Profitability by Vehicle</h3>
+            <div style={{ overflowX: 'auto' }}>
+              <table style={{ width: '100%', borderCollapse: 'collapse', minWidth: '760px' }}>
+                <thead>
+                  <tr style={{ backgroundColor: '#F8F9FB', textAlign: 'left' }}>
+                    {['Vehicle', 'Revenue', 'Cost', 'Net profit', 'Margin', 'Utilisation'].map(h => (
+                      <th key={h} style={{ padding: '12px 16px', fontSize: '12px', fontWeight: '700', color: colors.mediumGrey, textTransform: 'uppercase', letterSpacing: '0.04em' }}>{h}</th>
+                    ))}
+                  </tr>
+                </thead>
+                <tbody>
+                  {vehicleProfit.map(v => (
+                    <tr key={v.vehicle} style={{ borderTop: `1px solid ${colors.lightGrey}` }}>
+                      <td style={{ padding: '12px 16px', fontSize: '13px', fontWeight: '600', color: colors.darkGrey }}>{v.vehicle}</td>
+                      <td style={{ padding: '12px 16px', fontSize: '13px', color: colors.darkGrey, whiteSpace: 'nowrap' }}>{naira(v.revenue)}</td>
+                      <td style={{ padding: '12px 16px', fontSize: '13px', color: colors.mediumGrey, whiteSpace: 'nowrap' }}>{naira(v.cost)}</td>
+                      <td style={{ padding: '12px 16px' }}>
+                        <div style={{ display: 'flex', alignItems: 'center', gap: '10px' }}>
+                          <div style={{ flex: 1, minWidth: '60px', height: '8px', backgroundColor: colors.lightGrey, borderRadius: '4px', overflow: 'hidden' }}>
+                            <div style={{ width: `${v.net / maxNet * 100}%`, height: '100%', backgroundColor: colors.success }} />
+                          </div>
+                          <span style={{ fontSize: '13px', fontWeight: '700', color: colors.success, whiteSpace: 'nowrap' }}>{naira(v.net)}</span>
+                        </div>
+                      </td>
+                      <td style={{ padding: '12px 16px', fontSize: '13px', fontWeight: '700', color: v.margin >= 60 ? colors.success : v.margin >= 45 ? colors.warning : colors.danger }}>{v.margin}%</td>
+                      <td style={{ padding: '12px 16px', fontSize: '13px', color: colors.darkGrey }}>{v.util}%</td>
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
+            </div>
+          </div>
+        </div>
+      </div>
+    );
+  };
+
+  // SETTINGS VIEW
+  const SettingsView = () => {
+    const Toggle = ({ on, onClick }) => (
+      <button onClick={onClick} style={{
+        width: '42px', height: '24px', borderRadius: '12px', border: 'none', cursor: 'pointer', padding: '2px',
+        backgroundColor: on ? colors.success : colors.lightGrey, transition: 'background-color 0.2s', position: 'relative',
+      }}>
+        <span style={{ display: 'block', width: '20px', height: '20px', borderRadius: '50%', backgroundColor: colors.white, transform: on ? 'translateX(18px)' : 'translateX(0)', transition: 'transform 0.2s', boxShadow: '0 1px 3px rgba(0,0,0,0.3)' }} />
+      </button>
+    );
+    const tabs = [
+      { id: 'integrations', label: 'Integrations' },
+      { id: 'notifications', label: 'Notifications' },
+      { id: 'users', label: 'Users & Roles' },
+      { id: 'company', label: 'Company Profile' },
+    ];
+    const users = [
+      { name: 'Otimeyin Afolabi', role: 'Administrator', email: 'otimeyin@cnifleet.ng', status: 'active' },
+      { name: 'Fleet Officer', role: 'Operations', email: 'ops@cnifleet.ng', status: 'active' },
+      { name: 'Ngozi Finance', role: 'Finance', email: 'finance@cnifleet.ng', status: 'active' },
+      { name: 'Musa Workshop', role: 'Maintenance', email: 'workshop@cnifleet.ng', status: 'active' },
+      { name: 'Support Desk', role: 'Fleet Support', email: 'support@cnifleet.ng', status: 'invited' },
+    ];
+    const roleColor = { Administrator: colors.primary, Operations: colors.info, Finance: colors.success, Maintenance: colors.warning, 'Fleet Support': colors.accent };
+    const card = { backgroundColor: colors.white, borderRadius: '12px', boxShadow: '0 2px 8px rgba(0,0,0,0.06)' };
+
+    return (
+      <div style={{ padding: '32px' }}>
+        <div style={{ marginBottom: '24px' }}>
+          <h2 style={{ margin: 0, fontSize: '22px', fontWeight: '700', color: colors.darkGrey }}>Settings</h2>
+          <p style={{ margin: '4px 0 0', color: colors.mediumGrey, fontSize: '14px' }}>Integrations, notifications, users and company profile</p>
+        </div>
+
+        <div style={{ display: 'flex', gap: '4px', marginBottom: '20px', borderBottom: `1px solid ${colors.lightGrey}` }}>
+          {tabs.map(t => (
+            <button key={t.id} onClick={() => setSettingsTab(t.id)} style={{
+              padding: '12px 20px', border: 'none', background: 'none', cursor: 'pointer', fontSize: '14px',
+              fontWeight: '600', color: settingsTab === t.id ? colors.primary : colors.mediumGrey,
+              borderBottom: `2px solid ${settingsTab === t.id ? colors.primary : 'transparent'}`, marginBottom: '-1px',
+            }}>{t.label}</button>
+          ))}
+        </div>
+
+        {settingsTab === 'integrations' && (
+          <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(320px, 1fr))', gap: '16px' }}>
+            {integrations.map(x => (
+              <div key={x.key} style={{ ...card, padding: '18px 20px', display: 'flex', alignItems: 'flex-start', justifyContent: 'space-between', gap: '12px' }}>
+                <div>
+                  <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
+                    <span style={{ fontWeight: '700', color: colors.darkGrey, fontSize: '15px' }}>{x.name}</span>
+                    <span style={{ padding: '2px 8px', borderRadius: '20px', fontSize: '11px', fontWeight: '700', backgroundColor: x.connected ? '#D4EDDA' : colors.lightGrey, color: x.connected ? '#155724' : colors.mediumGrey }}>{x.connected ? 'Connected' : 'Off'}</span>
+                  </div>
+                  <p style={{ margin: '6px 0 0', fontSize: '13px', color: colors.mediumGrey, lineHeight: '1.4' }}>{x.desc}</p>
+                </div>
+                <Toggle on={x.connected} onClick={() => toggleIntegration(x.key)} />
+              </div>
+            ))}
+          </div>
+        )}
+
+        {settingsTab === 'notifications' && (
+          <div style={{ ...card, overflow: 'hidden' }}>
+            <table style={{ width: '100%', borderCollapse: 'collapse' }}>
+              <thead>
+                <tr style={{ backgroundColor: '#F8F9FB', textAlign: 'left' }}>
+                  {['Event', 'Email', 'SMS'].map(h => (
+                    <th key={h} style={{ padding: '14px 20px', fontSize: '12px', fontWeight: '700', color: colors.mediumGrey, textTransform: 'uppercase', letterSpacing: '0.04em' }}>{h}</th>
+                  ))}
+                </tr>
+              </thead>
+              <tbody>
+                {Object.keys(notifPrefs).map(evt => (
+                  <tr key={evt} style={{ borderTop: `1px solid ${colors.lightGrey}` }}>
+                    <td style={{ padding: '14px 20px', fontSize: '14px', fontWeight: '600', color: colors.darkGrey }}>{evt}</td>
+                    <td style={{ padding: '14px 20px' }}><Toggle on={notifPrefs[evt].email} onClick={() => toggleNotif(evt, 'email')} /></td>
+                    <td style={{ padding: '14px 20px' }}><Toggle on={notifPrefs[evt].sms} onClick={() => toggleNotif(evt, 'sms')} /></td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+          </div>
+        )}
+
+        {settingsTab === 'users' && (
+          <div style={{ ...card, overflow: 'hidden' }}>
+            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', padding: '16px 20px', borderBottom: `1px solid ${colors.lightGrey}` }}>
+              <span style={{ fontWeight: '700', color: colors.darkGrey }}>{users.length} users</span>
+              <Button size="small" icon={Plus}>Invite user</Button>
+            </div>
+            <table style={{ width: '100%', borderCollapse: 'collapse' }}>
+              <tbody>
+                {users.map(u => (
+                  <tr key={u.email} style={{ borderTop: `1px solid ${colors.lightGrey}` }}>
+                    <td style={{ padding: '14px 20px' }}>
+                      <div style={{ fontWeight: '600', color: colors.darkGrey, fontSize: '14px' }}>{u.name}</div>
+                      <div style={{ fontSize: '12px', color: colors.mediumGrey }}>{u.email}</div>
+                    </td>
+                    <td style={{ padding: '14px 20px' }}>
+                      <span style={{ padding: '4px 10px', borderRadius: '6px', fontSize: '12px', fontWeight: '700', backgroundColor: `${roleColor[u.role]}18`, color: roleColor[u.role] }}>{u.role}</span>
+                    </td>
+                    <td style={{ padding: '14px 20px', textAlign: 'right' }}>
+                      <span style={{ display: 'inline-flex', alignItems: 'center', gap: '6px', fontSize: '13px', fontWeight: '600', color: u.status === 'active' ? colors.success : colors.warning }}>
+                        <Circle size={8} fill="currentColor" /> {u.status === 'active' ? 'Active' : 'Invited'}
+                      </span>
+                    </td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+          </div>
+        )}
+
+        {settingsTab === 'company' && (
+          <div style={{ ...card, padding: '24px', maxWidth: '620px' }}>
+            <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '18px' }}>
+              {[['Company name', 'name'], ['RC number', 'rc'], ['Registered address', 'address'], ['Email', 'email'], ['Phone', 'phone']].map(([label, key]) => (
+                <div key={key} style={{ gridColumn: key === 'address' ? '1 / -1' : 'auto' }}>
+                  <label style={{ display: 'block', fontSize: '12px', color: colors.mediumGrey, textTransform: 'uppercase', letterSpacing: '0.04em', fontWeight: '700', marginBottom: '6px' }}>{label}</label>
+                  <input value={companyForm[key]} onChange={e => { setCompanyForm(f => ({ ...f, [key]: e.target.value })); setCompanySaved(false); }}
+                    style={{ width: '100%', padding: '10px 12px', border: `1px solid ${colors.lightGrey}`, borderRadius: '8px', fontSize: '14px', color: colors.darkGrey, boxSizing: 'border-box' }} />
+                </div>
+              ))}
+            </div>
+            <div style={{ display: 'flex', alignItems: 'center', gap: '14px', marginTop: '20px' }}>
+              <Button icon={Check} onClick={() => setCompanySaved(true)}>Save changes</Button>
+              {companySaved && <span style={{ display: 'inline-flex', alignItems: 'center', gap: '6px', color: colors.success, fontSize: '14px', fontWeight: '600' }}><CheckCircle size={16} /> Saved</span>}
+            </div>
+          </div>
+        )}
+      </div>
+    );
+  };
+
   // Main render
   return (
     <div style={{
@@ -4185,30 +4908,35 @@ const CNIFleetManagementUI = () => {
       backgroundColor: '#F5F7FA',
       minHeight: '100vh',
     }}>
-      <Sidebar />
+      {Sidebar()}
       <div style={{
         marginLeft: sidebarOpen ? '280px' : '0',
         transition: 'margin-left 0.3s ease',
       }}>
-        <Header />
+        {Header()}
         <div style={{ marginTop: '70px', minHeight: 'calc(100vh - 70px)' }}>
           {currentView === 'bookings' && (
             <>
-              {bookingsSubView === 'list' && <BookingsListView />}
-              {bookingsSubView === 'new' && <NewBookingView />}
-              {bookingsSubView === 'details' && <BookingDetailsView />}
-              {bookingsSubView === 'calendar' && <CalendarView />}
+              {bookingsSubView === 'list' && BookingsListView()}
+              {bookingsSubView === 'new' && NewBookingView()}
+              {bookingsSubView === 'details' && BookingDetailsView()}
+              {bookingsSubView === 'calendar' && CalendarView()}
             </>
           )}
           {currentView === 'fleet' && (
             <>
-              {fleetSubView === 'list' && <FleetListView />}
-              {fleetSubView === 'details' && <FleetVehicleDetailsView />}
-              {fleetSubView === 'map' && <FleetLiveMapView />}
+              {fleetSubView === 'list' && FleetListView()}
+              {fleetSubView === 'details' && FleetVehicleDetailsView()}
+              {fleetSubView === 'map' && FleetLiveMapView()}
             </>
           )}
-          {currentView === 'showcase' && <ShowcaseView />}
-          {currentView !== 'bookings' && currentView !== 'fleet' && currentView !== 'showcase' && (
+          {currentView === 'showcase' && ShowcaseView()}
+          {currentView === 'maintenance' && MaintenanceView()}
+          {currentView === 'clients' && ClientsView()}
+          {currentView === 'invoicing' && InvoicingView()}
+          {currentView === 'reports' && ReportsView()}
+          {currentView === 'settings' && SettingsView()}
+          {currentView !== 'bookings' && currentView !== 'fleet' && currentView !== 'showcase' && currentView !== 'maintenance' && currentView !== 'clients' && currentView !== 'invoicing' && currentView !== 'reports' && currentView !== 'settings' && (
             <div style={{ padding: '80px 32px', textAlign: 'center' }}>
               <div style={{
                 display: 'inline-block',
@@ -4246,8 +4974,8 @@ const CNIFleetManagementUI = () => {
         </div>
       </div>
       {/* Modals */}
-      <SuccessModal />
-      <AddVehicleModal />
+      {SuccessModal()}
+      {AddVehicleModal()}
     </div>
   );
 };
